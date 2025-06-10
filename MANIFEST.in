@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include requirements.txt
+include config.yaml
+include install.sh
+include Makefile
+recursive-include docs *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
