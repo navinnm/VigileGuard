@@ -29,9 +29,9 @@ classifiers = [
 ]
 keywords = ["security", "audit", "linux", "cybersecurity", "pentesting", "vulnerability", "scanner"]
 dependencies = [
-    "click>=8.0.0",
-    "rich>=10.0.0",
-    "PyYAML>=5.4.0",
+    "click>=8.1.7",
+    "rich>=13.7.0", 
+    "PyYAML>=6.0.1",
 ]
 
 [project.urls]

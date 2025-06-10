@@ -7,6 +7,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/issues)
 [![GitHub stars](https://img.shields.io/github/stars/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/stargazers)
 [![CI/CD](https://github.com/navinnm/VigileGuard/workflows/VigileGuard%20CI/CD%20Pipeline/badge.svg)](https://github.com/navinnm/VigileGuard/actions)
+[![Security Status](https://img.shields.io/badge/security-monitored-green.svg)](SECURITY.md)
 
 ## 🚀 Why VigileGuard?
 
