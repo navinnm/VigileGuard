@@ -18,8 +18,8 @@ import logging
 
 # Import from previous phases
 from vigileguard import Finding, SeverityLevel, console
-from phase2_web_security import WebServerSecurityChecker, NetworkSecurityChecker
-from phase2_enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper, TrendTracker
+from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper, TrendTracker
 
 
 class ConfigurationManager:
