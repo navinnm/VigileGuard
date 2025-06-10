@@ -620,6 +620,9 @@ class Phase2AuditEngine:
     """Enhanced audit engine for Phase 2 with web server and network security"""
     
     def __init__(self, config_path: Optional[str] = None, environment: str = None):
+        # Initialize logger first
+        self.logger = logging.getLogger(__name__)
+        
         self.config_manager = ConfigurationManager(config_path)
         self.config = self.config_manager.get_environment_config(environment)
         
@@ -632,7 +635,6 @@ class Phase2AuditEngine:
         # Initialize checkers (Phase 1 + Phase 2)
         self.checkers = self._initialize_checkers()
         self.all_findings: List[Finding] = []
-        self.logger = logging.getLogger(__name__)
     
     def _adapt_notification_config(self) -> Dict[str, Any]:
         """Adapt existing config format to Phase 2 notification format"""
