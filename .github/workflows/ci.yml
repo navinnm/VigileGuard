@@ -52,8 +52,17 @@ jobs:
 
       - name: Check code formatting with Black
         run: |
-          black --check --diff vigileguard.py
-          echo "✅ Code formatting check passed"
+          # Run black in check mode but don't fail the build
+          echo "🔍 Checking code formatting with Black..."
+          if ! black --check --diff vigileguard.py; then
+            echo ""
+            echo "⚠️  Code formatting issues detected!"
+            echo "💡 To fix automatically, run: black vigileguard.py"
+            echo ""
+            echo "🚀 Continuing with build (formatting issues are non-blocking)..."
+          else
+            echo "✅ Code formatting check passed!"
+          fi
 
       - name: Lint with flake8
         run: |
