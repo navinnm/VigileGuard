@@ -9,6 +9,7 @@ import json
 import yaml
 import requests
 import smtplib
+import subprocess
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Any, Optional
@@ -16,10 +17,53 @@ from pathlib import Path
 from datetime import datetime
 import logging
 
-# Import from previous phases
-from vigileguard import Finding, SeverityLevel, console
-from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
-from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper, TrendTracker
+# Import base classes to avoid circular imports
+from enum import Enum
+from dataclasses import dataclass, asdict
+
+# Re-define core classes to avoid circular imports
+class SeverityLevel(Enum):
+    """Security finding severity levels"""
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+@dataclass
+class Finding:
+    """Represents a security finding"""
+    category: str
+    severity: SeverityLevel
+    title: str
+    description: str
+    recommendation: str
+    details: Optional[Dict[str, Any]] = None  
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert finding to dictionary"""
+        result = asdict(self)
+        result["severity"] = self.severity.value
+        return result
+
+# Create a simple console that works with or without rich
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    RICH_AVAILABLE = True
+    console = Console()
+except ImportError:
+    RICH_AVAILABLE = False
+    class Console:
+        def print(self, *args, **kwargs):
+            print(*args)
+    
+    class Panel:
+        @staticmethod
+        def fit(text, **kwargs):
+            return text
+    
+    console = Console()
 
 
 class ConfigurationManager:
@@ -190,7 +234,10 @@ class ConfigurationManager:
                 if custom_config:
                     default_config = self._deep_merge(default_config, custom_config)
             except Exception as e:
-                console.print(f"Warning: Error loading config: {e}", style="yellow")
+                if RICH_AVAILABLE:
+                    console.print(f"Warning: Error loading config: {e}", style="yellow")
+                else:
+                    print(f"Warning: Error loading config: {e}")
         
         return default_config
     
@@ -266,7 +313,10 @@ class ConfigurationManager:
         with open(output_path, 'w') as f:
             yaml.dump(self.config, f, default_flow_style=False, indent=2)
         
-        console.print(f"Sample configuration created: {output_path}", style="green")
+        if RICH_AVAILABLE:
+            console.print(f"Sample configuration created: {output_path}", style="green")
+        else:
+            print(f"Sample configuration created: {output_path}")
 
 
 class NotificationManager:
@@ -293,26 +343,6 @@ class NotificationManager:
                 return True
         
         return False
-    
-    def send_notifications(self, findings: List[Finding], scan_info: Dict[str, Any]):
-        """Send notifications through configured channels"""
-        if not self.should_notify(findings):
-            return
-        
-        channels = self.notification_config.get('channels', [])
-        
-        for channel in channels:
-            try:
-                if channel == 'email':
-                    self._send_email_notification(findings, scan_info)
-                elif channel == 'webhook':
-                    self._send_webhook_notification(findings, scan_info)
-                elif channel == 'slack':
-                    self._send_slack_notification(findings, scan_info)
-                else:
-                    self.logger.warning(f"Unknown notification channel: {channel}")
-            except Exception as e:
-                self.logger.error(f"Failed to send {channel} notification: {e}")
     
     def send_notifications(self, findings: List[Finding], scan_info: Dict[str, Any]):
         """Send notifications through configured channels"""
@@ -689,15 +719,13 @@ class Phase2AuditEngine:
         """Initialize all security checkers"""
         checkers = []
         
-        # Phase 1 checkers (imported from original vigileguard.py)
-        # checkers.append(FilePermissionChecker())
-        # checkers.append(UserAccountChecker())
-        # checkers.append(SSHConfigChecker())
-        # checkers.append(SystemInfoChecker())
-        
         # Phase 2 checkers
-        checkers.append(WebServerSecurityChecker())
-        checkers.append(NetworkSecurityChecker())
+        try:
+            from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+            checkers.append(WebServerSecurityChecker())
+            checkers.append(NetworkSecurityChecker())
+        except ImportError as e:
+            self.logger.warning(f"Could not import Phase 2 checkers: {e}")
         
         return checkers
     
@@ -712,10 +740,15 @@ class Phase2AuditEngine:
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
         
-        console.print(Panel.fit("🛡️ VigileGuard Phase 2 Security Audit", style="bold blue"))
-        console.print(f"Environment: {scan_info['environment']}")
-        console.print(f"Starting audit at {scan_info['timestamp']}")
-        console.print()
+        if RICH_AVAILABLE:
+            console.print(Panel.fit("🛡️ VigileGuard Phase 2 Security Audit", style="bold blue"))
+            console.print(f"Environment: {scan_info['environment']}")
+            console.print(f"Starting audit at {scan_info['timestamp']}")
+            console.print()
+        else:
+            print("🛡️ VigileGuard Phase 2 Security Audit")
+            print(f"Environment: {scan_info['environment']}")
+            print(f"Starting audit at {scan_info['timestamp']}")
         
         # Send scan started notification
         self.webhook_integration.send_scan_started(scan_info)
@@ -724,7 +757,11 @@ class Phase2AuditEngine:
         for checker in self.checkers:
             task_name = checker.__class__.__name__
             try:
-                console.print(f"Running {task_name}...", style="blue")
+                if RICH_AVAILABLE:
+                    console.print(f"Running {task_name}...", style="blue")
+                else:
+                    print(f"Running {task_name}...")
+                    
                 findings = checker.check()
                 self.all_findings.extend(findings)
                 
@@ -733,28 +770,49 @@ class Phase2AuditEngine:
                     if finding.severity == SeverityLevel.CRITICAL:
                         self.webhook_integration.send_critical_finding(finding, scan_info)
                 
-                console.print(f"✅ {task_name} completed - {len(findings)} findings", style="green")
+                if RICH_AVAILABLE:
+                    console.print(f"✅ {task_name} completed - {len(findings)} findings", style="green")
+                else:
+                    print(f"✅ {task_name} completed - {len(findings)} findings")
                 
             except Exception as e:
-                console.print(f"❌ Error in {task_name}: {e}", style="red")
+                if RICH_AVAILABLE:
+                    console.print(f"❌ Error in {task_name}: {e}", style="red")
+                else:
+                    print(f"❌ Error in {task_name}: {e}")
                 self.logger.error(f"Error in {task_name}: {e}")
         
         # Generate enhanced reports
-        report_manager = ReportManager(self.all_findings, scan_info)
-        
-        # Save reports in configured formats
-        output_dir = self.config.get('reporting', {}).get('output_directory', './reports')
-        generated_files = report_manager.generate_all_formats(output_dir)
-        
-        console.print(f"\n📊 Reports generated:", style="bold green")
-        for format_type, file_path in generated_files.items():
-            console.print(f"  {format_type.upper()}: {file_path}")
+        try:
+            from enhanced_reporting import ReportManager
+            report_manager = ReportManager(self.all_findings, scan_info)
+            
+            # Save reports in configured formats
+            output_dir = self.config.get('reporting', {}).get('output_directory', './reports')
+            generated_files = report_manager.generate_all_formats(output_dir)
+            
+            if RICH_AVAILABLE:
+                console.print(f"\n📊 Reports generated:", style="bold green")
+                for format_type, file_path in generated_files.items():
+                    console.print(f"  {format_type.upper()}: {file_path}")
+            else:
+                print(f"\n📊 Reports generated:")
+                for format_type, file_path in generated_files.items():
+                    print(f"  {format_type.upper()}: {file_path}")
+        except ImportError:
+            if RICH_AVAILABLE:
+                console.print("⚠️ Enhanced reporting not available", style="yellow")
+            else:
+                print("⚠️ Enhanced reporting not available")
         
         # Send notifications
         try:
             self.notification_manager.send_notifications(self.all_findings, scan_info)
         except Exception as e:
-            console.print(f"Warning: Failed to send notifications: {e}", style="yellow")
+            if RICH_AVAILABLE:
+                console.print(f"Warning: Failed to send notifications: {e}", style="yellow")
+            else:
+                print(f"Warning: Failed to send notifications: {e}")
         
         # Send scan completed notification
         self.webhook_integration.send_scan_completed(self.all_findings, scan_info)
@@ -768,29 +826,49 @@ class Phase2AuditEngine:
         if schedule_config.get('daily_scan', {}).get('enabled', False):
             time = schedule_config['daily_scan'].get('time', '02:00')
             if self.scheduling_manager.setup_daily_scan(time):
-                console.print(f"✅ Daily scan scheduled for {time}", style="green")
+                if RICH_AVAILABLE:
+                    console.print(f"✅ Daily scan scheduled for {time}", style="green")
+                else:
+                    print(f"✅ Daily scan scheduled for {time}")
             else:
-                console.print("❌ Failed to setup daily scan", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ Failed to setup daily scan", style="red")
+                else:
+                    print("❌ Failed to setup daily scan")
         
         if schedule_config.get('weekly_scan', {}).get('enabled', False):
             day = schedule_config['weekly_scan'].get('day', 0)
             time = schedule_config['weekly_scan'].get('time', '03:00')
             if self.scheduling_manager.setup_weekly_scan(day, time):
-                console.print(f"✅ Weekly scan scheduled for day {day} at {time}", style="green")
+                if RICH_AVAILABLE:
+                    console.print(f"✅ Weekly scan scheduled for day {day} at {time}", style="green")
+                else:
+                    print(f"✅ Weekly scan scheduled for day {day} at {time}")
             else:
-                console.print("❌ Failed to setup weekly scan", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ Failed to setup weekly scan", style="red")
+                else:
+                    print("❌ Failed to setup weekly scan")
     
     def validate_configuration(self):
         """Validate current configuration"""
         issues = self.config_manager.validate_config()
         
         if issues:
-            console.print("⚠️  Configuration Issues Found:", style="yellow")
-            for issue in issues:
-                console.print(f"  • {issue}", style="yellow")
+            if RICH_AVAILABLE:
+                console.print("⚠️  Configuration Issues Found:", style="yellow")
+                for issue in issues:
+                    console.print(f"  • {issue}", style="yellow")
+            else:
+                print("⚠️  Configuration Issues Found:")
+                for issue in issues:
+                    print(f"  • {issue}")
             return False
         else:
-            console.print("✅ Configuration validation passed", style="green")
+            if RICH_AVAILABLE:
+                console.print("✅ Configuration validation passed", style="green")
+            else:
+                print("✅ Configuration validation passed")
             return True
 
 
@@ -844,37 +922,59 @@ def main_phase2():
             
             # Handle specific output format requests
             if output and output_format != 'all':
-                report_manager = ReportManager(findings, {
-                    'timestamp': datetime.now().isoformat(),
-                    'hostname': os.uname().nodename,
-                    'version': '2.0.0'
-                })
-                
-                if output_format == 'html':
-                    report_manager.html_reporter.generate_report(output)
-                elif output_format == 'json':
-                    technical_report = report_manager.generate_technical_report()
-                    with open(output, 'w') as f:
-                        json.dump(technical_report, f, indent=2, default=str)
-                
-                console.print(f"Report saved to {output}", style="green")
+                try:
+                    from enhanced_reporting import ReportManager
+                    report_manager = ReportManager(findings, {
+                        'timestamp': datetime.now().isoformat(),
+                        'hostname': os.uname().nodename,
+                        'version': '2.0.0'
+                    })
+                    
+                    if output_format == 'html':
+                        report_manager.html_reporter.generate_report(output)
+                    elif output_format == 'json':
+                        technical_report = report_manager.generate_technical_report()
+                        with open(output, 'w') as f:
+                            json.dump(technical_report, f, indent=2, default=str)
+                    
+                    if RICH_AVAILABLE:
+                        console.print(f"Report saved to {output}", style="green")
+                    else:
+                        print(f"Report saved to {output}")
+                except ImportError:
+                    if RICH_AVAILABLE:
+                        console.print("❌ Enhanced reporting not available for specific output formats", style="red")
+                    else:
+                        print("❌ Enhanced reporting not available for specific output formats")
             
             # Exit with appropriate code
             critical_high_count = sum(1 for f in findings 
                                     if f.severity in [SeverityLevel.CRITICAL, SeverityLevel.HIGH])
             
             if critical_high_count > 0:
-                console.print(f"\n⚠️  Found {critical_high_count} critical/high severity issues", style="red")
+                if RICH_AVAILABLE:
+                    console.print(f"\n⚠️  Found {critical_high_count} critical/high severity issues", style="red")
+                else:
+                    print(f"\n⚠️  Found {critical_high_count} critical/high severity issues")
                 return 1
             else:
-                console.print(f"\n✅ Audit completed successfully", style="green")
+                if RICH_AVAILABLE:
+                    console.print(f"\n✅ Audit completed successfully", style="green")
+                else:
+                    print(f"\n✅ Audit completed successfully")
                 return 0
                 
         except KeyboardInterrupt:
-            console.print("\n❌ Audit interrupted by user", style="red")
+            if RICH_AVAILABLE:
+                console.print("\n❌ Audit interrupted by user", style="red")
+            else:
+                print("\n❌ Audit interrupted by user")
             return 130
         except Exception as e:
-            console.print(f"\n❌ Error during audit: {e}", style="red")
+            if RICH_AVAILABLE:
+                console.print(f"\n❌ Error during audit: {e}", style="red")
+            else:
+                print(f"\n❌ Error during audit: {e}")
             if debug:
                 import traceback
                 traceback.print_exc()
