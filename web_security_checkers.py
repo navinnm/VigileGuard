@@ -225,15 +225,15 @@ class WebServerSecurityChecker(SecurityChecker):
             
             # Check for security headers
             security_headers = [
-                "Header always set X-Content-Type-Options nosniff",
-                "Header always set X-Frame-Options",
-                "Header always set X-XSS-Protection"
+                "X-Content-Type-Options",
+                "X-Frame-Options", 
+                "X-XSS-Protection"
             ]
             
             missing_headers = []
             for header in security_headers:
-                if header.split()[4] not in config_content:
-                    missing_headers.append(header.split()[4])
+                if header not in config_content:
+                    missing_headers.append(header)
             
             if missing_headers:
                 self.add_finding(
