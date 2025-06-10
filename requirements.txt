@@ -1,3 +1,5 @@
 click>=8.1.7
 rich>=13.7.0
 PyYAML>=6.0.1
+requests>=2.28.0     # For webhooks
+jinja2>=3.1.0       # For HTML templates (optional)

@@ -30,6 +30,13 @@ try:
     from rich.table import Table
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
+    from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+    from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
+    from phase2_integration import ConfigurationManager, NotificationManager
+    PHASE2_ENABLED = True
+except ImportError:
+    PHASE2_ENABLED = False
+
 except ImportError:
     print("Error: Required dependencies not installed.")
     print("Install with: pip install click rich")
@@ -598,6 +605,17 @@ class AuditEngine:
             SystemInfoChecker()
         ]
         self.all_findings: List[Finding] = []
+
+    if PHASE2_ENABLED:
+            self.config_manager = ConfigurationManager(config_file)
+            self.enhanced_config = self.config_manager.get_environment_config()
+            self.notification_manager = NotificationManager(self.enhanced_config)
+
+    if PHASE2_ENABLED:
+            self.checkers.extend([
+                WebServerSecurityChecker(),
+                NetworkSecurityChecker()
+            ])
     
     def _load_config(self, config_file: Optional[str]) -> Dict[str, Any]:
         """Load configuration from file or use defaults"""
@@ -647,13 +665,15 @@ class AuditEngine:
         return self.all_findings
     
     def generate_report(self, format_type: str = "console") -> str:
-        """Generate audit report in specified format"""
-        if format_type == "console":
-            return self._generate_console_report()
-        elif format_type == "json":
-            return self._generate_json_report()
+        if format_type == "html" and PHASE2_ENABLED:
+            html_reporter = HTMLReporter(self.all_findings, self._get_scan_info())
+            return html_reporter.generate_report("report.html")
+        elif format_type == "compliance" and PHASE2_ENABLED:
+            compliance_mapper = ComplianceMapper()
+            return compliance_mapper.generate_compliance_report(self.all_findings)
         else:
-            raise ValueError(f"Unsupported format: {format_type}")
+            # Use existing Phase 1 methods
+            return self._generate_console_report() if format_type == "console" else self._generate_json_report()
     
     def _generate_console_report(self) -> str:
         """Generate console-friendly report"""
