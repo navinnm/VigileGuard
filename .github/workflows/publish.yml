@@ -43,7 +43,7 @@ jobs:
           echo "❌ Upload failed. Common causes:"
           echo "1. Package name 'vigileguard' already exists"
           echo "2. Version '1.0.0' already uploaded"
-          echo "3. Try changing name to 'vigileguard-security' or increment version"
+          echo "3. Try changing name to 'vigileguard' or increment version"
           exit 1
         }
         echo "✅ Published to Test PyPI"
