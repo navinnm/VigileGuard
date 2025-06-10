@@ -7,7 +7,7 @@ FROM python:3.11-slim
 # Metadata
 LABEL maintainer="VigileGuard Team <https://github.com/navinnm/VigileGuard>"
 LABEL description="VigileGuard - Linux Security Audit Tool"
-LABEL version="1.0.3"
+LABEL version="1.0.4"
 LABEL repository="https://github.com/navinnm/VigileGuard"
 
 # Create non-root user first
