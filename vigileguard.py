@@ -30,6 +30,12 @@ try:
     from rich.table import Table
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
+except ImportError:
+    print("Error: Required dependencies not installed.")
+    print("Install with: pip install click rich")
+    sys.exit(1)
+
+try:
     from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
     from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
     from phase2_integration import ConfigurationManager, NotificationManager
@@ -291,6 +297,16 @@ class UserAccountChecker(SecurityChecker):
                 description="Insufficient permissions to check for empty passwords",
                 recommendation="Run VigileGuard with appropriate privileges"
             )
+
+    def _get_scan_info(self) -> Dict[str, Any]:
+        """Get scan information dictionary"""
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'tool': 'VigileGuard',
+            'version': '2.0.0',
+            'hostname': platform.node(),
+            'repository': 'https://github.com/navinnm/VigileGuard'
+        }
     
     def _check_duplicate_uids(self):
         """Check for duplicate UIDs"""
@@ -594,8 +610,6 @@ class SystemInfoChecker(SecurityChecker):
                     )
 
 class AuditEngine:
-    """Main audit engine that coordinates all security checks"""
-    
     def __init__(self, config_file: Optional[str] = None):
         self.config = self._load_config(config_file)
         self.checkers = [
@@ -605,13 +619,14 @@ class AuditEngine:
             SystemInfoChecker()
         ]
         self.all_findings: List[Finding] = []
-
-    if PHASE2_ENABLED:
+        
+        # Phase 2 enhancements (properly indented)
+        if PHASE2_ENABLED:
             self.config_manager = ConfigurationManager(config_file)
             self.enhanced_config = self.config_manager.get_environment_config()
             self.notification_manager = NotificationManager(self.enhanced_config)
-
-    if PHASE2_ENABLED:
+            
+            # Add Phase 2 checkers
             self.checkers.extend([
                 WebServerSecurityChecker(),
                 NetworkSecurityChecker()
@@ -753,46 +768,142 @@ class AuditEngine:
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--output', '-o', help='Output file path')
 @click.option('--format', '-f', 'output_format', default='console', 
-              type=click.Choice(['console', 'json']), help='Output format')
+              type=click.Choice(['console', 'json', 'html', 'compliance', 'all']), 
+              help='Output format')
+@click.option('--environment', '-e', help='Environment (development/staging/production)')
+@click.option('--notifications', is_flag=True, help='Enable notifications')
 @click.option('--debug', is_flag=True, help='Enable debug output')
-@click.version_option(version='1.0.0')
-def main(config: Optional[str], output: Optional[str], output_format: str, debug: bool):
+@click.version_option(version='2.0.0')
+def main(config: Optional[str], output: Optional[str], output_format: str, 
+         environment: Optional[str], notifications: bool, debug: bool):
     """
-    VigileGuard - Linux Security Audit Tool
-    
-    Performs comprehensive security audits of Linux systems including:
-    - File permission analysis
-    - User account security checks  
-    - SSH configuration review
-    - System information gathering
-    
-    Repository: https://github.com/navinnm/VigileGuard
-    """
+        VigileGuard - Linux Security Audit Tool (Phase 1 + 2)
+        
+        Performs comprehensive security audits including:
+        - File permission analysis
+        - User account security checks  
+        - SSH configuration review
+        - System information gathering
+        - Web server security (Phase 2)
+        - Network security analysis (Phase 2)
+        - Enhanced reporting (Phase 2)
+        
+        Repository: https://github.com/navinnm/VigileGuard
+        """
     try:
-        # Initialize audit engine
-        engine = AuditEngine(config)
+        # Check if Phase 2 components are available
+        phase2_available = False
+        try:
+            # Try to import Phase 2 components
+            from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+            from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
+            from phase2_integration import ConfigurationManager, NotificationManager
+            phase2_available = True
+            console.print("✅ Phase 2 features available", style="green")
+        except ImportError as e:
+            if output_format in ['html', 'compliance', 'all']:
+                console.print(f"❌ Phase 2 features required for {output_format} format", style="red")
+                console.print("Please ensure Phase 2 files are in the same directory:", style="yellow")
+                console.print("  - web_security_checkers.py", style="yellow")
+                console.print("  - enhanced_reporting.py", style="yellow") 
+                console.print("  - phase2_integration.py", style="yellow")
+                sys.exit(1)
+            phase2_available = False
+        
+        # Initialize appropriate engine based on available features
+        if phase2_available:
+            # Use Phase 2 enhanced engine
+            from phase2_integration import Phase2AuditEngine
+            engine = Phase2AuditEngine(config, environment)
+        else:
+            # Use original Phase 1 engine
+            engine = AuditEngine(config)
         
         # Run the audit
         findings = engine.run_audit()
         
-        # Generate report
+        # Generate reports based on format
+        scan_info = {
+            'timestamp': datetime.now().isoformat(),
+            'tool': 'VigileGuard',
+            'version': '2.0.0' if phase2_available else '1.0.0',
+            'hostname': platform.node(),
+            'repository': 'https://github.com/navinnm/VigileGuard'
+        }
+        
         if output_format == 'console' and not output:
-            # Display directly to console
-            engine.generate_report('console')
-        else:
-            # Generate report content
-            report_content = engine.generate_report(output_format)
+            # Console output is handled by the engine
+            pass
+        elif output_format == 'json':
+            # JSON output
+            if phase2_available:
+                report_manager = ReportManager(findings, scan_info)
+                report_content = report_manager.generate_technical_report()
+            else:
+                # Use original JSON generation
+                report_content = engine.generate_report('json')
             
             if output:
-                # Write to file
                 with open(output, 'w') as f:
-                    f.write(report_content)
-                console.print(f"Report saved to {output}", style="green")
+                    if isinstance(report_content, str):
+                        f.write(report_content)
+                    else:
+                        json.dump(report_content, f, indent=2, default=str)
+                console.print(f"JSON report saved to {output}", style="green")
             else:
-                # Print to stdout
-                print(report_content)
+                if isinstance(report_content, str):
+                    print(report_content)
+                else:
+                    print(json.dumps(report_content, indent=2, default=str))
         
-        # Exit with error code if critical/high issues found
+        elif output_format == 'html':
+            if not phase2_available:
+                console.print("❌ HTML format requires Phase 2 components", style="red")
+                sys.exit(1)
+            
+            # HTML output (Phase 2)
+            html_reporter = HTMLReporter(findings, scan_info)
+            output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            html_reporter.generate_report(output_file)
+            console.print(f"HTML report saved to {output_file}", style="green")
+        
+        elif output_format == 'compliance':
+            if not phase2_available:
+                console.print("❌ Compliance format requires Phase 2 components", style="red")
+                sys.exit(1)
+            
+            # Compliance output (Phase 2)
+            compliance_mapper = ComplianceMapper()
+            compliance_report = compliance_mapper.generate_compliance_report(findings)
+            output_file = output or f"vigileguard_compliance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            with open(output_file, 'w') as f:
+                json.dump(compliance_report, f, indent=2, default=str)
+            console.print(f"Compliance report saved to {output_file}", style="green")
+        
+        elif output_format == 'all':
+            if not phase2_available:
+                console.print("❌ 'all' format requires Phase 2 components", style="red")
+                sys.exit(1)
+            
+            # Generate all formats (Phase 2)
+            report_manager = ReportManager(findings, scan_info)
+            output_dir = output or './reports'
+            generated_files = report_manager.generate_all_formats(output_dir)
+            
+            console.print("📊 All reports generated:", style="bold green")
+            for format_type, file_path in generated_files.items():
+                console.print(f"  {format_type.upper()}: {file_path}")
+        
+        # Send notifications if enabled (Phase 2)
+        if notifications and phase2_available:
+            try:
+                engine.notification_manager.send_notifications(findings, scan_info)
+                console.print("📧 Notifications sent", style="green")
+            except Exception as e:
+                console.print(f"⚠️ Notification failed: {e}", style="yellow")
+        
+        # Exit with appropriate code
         critical_high_count = sum(1 for f in findings 
                                 if f.severity in [SeverityLevel.CRITICAL, SeverityLevel.HIGH])
         
