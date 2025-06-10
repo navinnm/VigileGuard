@@ -23,12 +23,14 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Import rich components with error handling
 try:
     import click
     from rich.console import Console
     from rich.table import Table
-    from rich.panel import Panel  # Added missing Panel import
+    from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
+    RICH_AVAILABLE = True
 except ImportError:
     print("Error: Required dependencies not installed.")
     print("Install with: pip install click rich")
@@ -599,6 +601,7 @@ class AuditEngine:
         self.all_findings: List[Finding] = []
         
         # Try to add Phase 2 checkers if available
+        self.phase2_available = False
         try:
             # Import Phase 2 checkers at runtime to avoid circular imports
             from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
@@ -607,6 +610,7 @@ class AuditEngine:
                 NetworkSecurityChecker()
             ])
             console.print("✅ Phase 2 components loaded successfully", style="green")
+            self.phase2_available = True
         except ImportError as e:
             console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
 
@@ -615,7 +619,7 @@ class AuditEngine:
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': __version__,
+            'version': '2.0.0' if self.phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -645,25 +649,40 @@ class AuditEngine:
     
     def run_audit(self) -> List[Finding]:
         """Run all security checks"""
-        console.print(Panel.fit("🛡️ VigileGuard Security Audit", style="bold blue"))
-        console.print(f"Starting audit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        console.print()
+        if RICH_AVAILABLE:
+            console.print(Panel.fit("🛡️ VigileGuard Security Audit", style="bold blue"))
+            console.print(f"Starting audit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            console.print()
+        else:
+            print("🛡️ VigileGuard Security Audit")
+            print(f"Starting audit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            
+        if RICH_AVAILABLE:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                
+                for checker in self.checkers:
+                    task = progress.add_task(f"Running {checker.__class__.__name__}...", total=None)
+                    try:
+                        findings = checker.check()
+                        self.all_findings.extend(findings)
+                        progress.update(task, completed=True)
+                    except Exception as e:
+                        console.print(f"Error in {checker.__class__.__name__}: {e}", style="red")
+                        progress.update(task, completed=True)
+        else:
+            # Fallback without rich
             for checker in self.checkers:
-                task = progress.add_task(f"Running {checker.__class__.__name__}...", total=None)
+                print(f"Running {checker.__class__.__name__}...")
                 try:
                     findings = checker.check()
                     self.all_findings.extend(findings)
-                    progress.update(task, completed=True)
+                    print(f"✅ {checker.__class__.__name__} completed")
                 except Exception as e:
-                    console.print(f"Error in {checker.__class__.__name__}: {e}", style="red")
-                    progress.update(task, completed=True)
+                    print(f"❌ Error in {checker.__class__.__name__}: {e}")
         
         return self.all_findings
     
@@ -687,51 +706,71 @@ class AuditEngine:
     
     def _generate_console_report(self) -> str:
         """Generate console-friendly report"""
-        console.print()
-        console.print(Panel.fit("📊 Audit Results", style="bold green"))
+        if RICH_AVAILABLE:
+            console.print()
+            console.print(Panel.fit("📊 Audit Results", style="bold green"))
+        else:
+            print("\n📊 Audit Results")
         
         # Count findings by severity
         severity_counts = {level: 0 for level in SeverityLevel}
         for finding in self.all_findings:
             severity_counts[finding.severity] += 1
         
-        # Summary table
-        summary_table = Table(title="Summary")
-        summary_table.add_column("Severity", style="bold")
-        summary_table.add_column("Count", justify="right")
-        
-        severity_colors = {
-            SeverityLevel.CRITICAL: "red",
-            SeverityLevel.HIGH: "orange1", 
-            SeverityLevel.MEDIUM: "yellow",
-            SeverityLevel.LOW: "blue",
-            SeverityLevel.INFO: "green"
-        }
-        
-        for severity, count in severity_counts.items():
-            if count > 0:
-                color = severity_colors.get(severity, "white")
-                summary_table.add_row(severity.value, str(count), style=color)
-        
-        console.print(summary_table)
-        console.print()
+        if RICH_AVAILABLE:
+            # Summary table
+            summary_table = Table(title="Summary")
+            summary_table.add_column("Severity", style="bold")
+            summary_table.add_column("Count", justify="right")
+            
+            severity_colors = {
+                SeverityLevel.CRITICAL: "red",
+                SeverityLevel.HIGH: "orange1", 
+                SeverityLevel.MEDIUM: "yellow",
+                SeverityLevel.LOW: "blue",
+                SeverityLevel.INFO: "green"
+            }
+            
+            for severity, count in severity_counts.items():
+                if count > 0:
+                    color = severity_colors.get(severity, "white")
+                    summary_table.add_row(severity.value, str(count), style=color)
+            
+            console.print(summary_table)
+            console.print()
+        else:
+            # Fallback without rich
+            print("\nSummary:")
+            for severity, count in severity_counts.items():
+                if count > 0:
+                    print(f"  {severity.value}: {count}")
         
         # Detailed findings
         if self.all_findings:
-            for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
-                color = severity_colors.get(finding.severity, "white")
-                
-                finding_panel = Panel(
-                    f"[bold]{finding.title}[/bold]\n\n"
-                    f"[italic]{finding.description}[/italic]\n\n"
-                    f"💡 [bold]Recommendation:[/bold] {finding.recommendation}",
-                    title=f"[{color}]{finding.severity.value}[/{color}] - {finding.category}",
-                    border_style=color
-                )
-                console.print(finding_panel)
-                console.print()
+            if RICH_AVAILABLE:
+                for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
+                    color = severity_colors.get(finding.severity, "white")
+                    
+                    finding_panel = Panel(
+                        f"[bold]{finding.title}[/bold]\n\n"
+                        f"[italic]{finding.description}[/italic]\n\n"
+                        f"💡 [bold]Recommendation:[/bold] {finding.recommendation}",
+                        title=f"[{color}]{finding.severity.value}[/{color}] - {finding.category}",
+                        border_style=color
+                    )
+                    console.print(finding_panel)
+                    console.print()
+            else:
+                # Fallback without rich
+                for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
+                    print(f"\n[{finding.severity.value}] {finding.category}: {finding.title}")
+                    print(f"Description: {finding.description}")
+                    print(f"Recommendation: {finding.recommendation}")
         else:
-            console.print("✅ No security issues found!", style="bold green")
+            if RICH_AVAILABLE:
+                console.print("✅ No security issues found!", style="bold green")
+            else:
+                print("✅ No security issues found!")
         
         return ""
     
@@ -785,25 +824,41 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
             # Try to import Phase 2 components
             from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
             from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
-            from phase2_integration import ConfigurationManager, NotificationManager
             phase2_available = True
-            console.print("✅ Phase 2 features available", style="green")
+            if RICH_AVAILABLE:
+                console.print("✅ Phase 2 features available", style="green")
+            else:
+                print("✅ Phase 2 features available")
         except ImportError as e:
             if output_format in ['html', 'compliance', 'all']:
-                console.print(f"❌ Phase 2 features required for {output_format} format", style="red")
-                console.print("Please ensure Phase 2 files are in the same directory:", style="yellow")
-                console.print("  - web_security_checkers.py", style="yellow")
-                console.print("  - enhanced_reporting.py", style="yellow") 
-                console.print("  - phase2_integration.py", style="yellow")
+                if RICH_AVAILABLE:
+                    console.print(f"❌ Phase 2 features required for {output_format} format", style="red")
+                    console.print("Please ensure Phase 2 files are in the same directory:", style="yellow")
+                    console.print("  - web_security_checkers.py", style="yellow")
+                    console.print("  - enhanced_reporting.py", style="yellow") 
+                    console.print("  - phase2_integration.py", style="yellow")
+                else:
+                    print(f"❌ Phase 2 features required for {output_format} format")
+                    print("Please ensure Phase 2 files are in the same directory:")
+                    print("  - web_security_checkers.py")
+                    print("  - enhanced_reporting.py") 
+                    print("  - phase2_integration.py")
                 sys.exit(1)
             phase2_available = False
-            console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
+            if RICH_AVAILABLE:
+                console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
+            else:
+                print(f"⚠️ Phase 2 components not available: {e}")
         
         # Initialize appropriate engine based on available features
         if phase2_available:
-            # Use Phase 2 enhanced engine
-            from phase2_integration import Phase2AuditEngine
-            engine = Phase2AuditEngine(config, environment)
+            # Try to use Phase 2 enhanced engine
+            try:
+                from phase2_integration import Phase2AuditEngine
+                engine = Phase2AuditEngine(config, environment)
+            except ImportError:
+                # Fall back to Phase 1 engine with Phase 2 checkers
+                engine = AuditEngine(config)
         else:
             # Use original Phase 1 engine
             engine = AuditEngine(config)
@@ -826,8 +881,13 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         elif output_format == 'json':
             # JSON output
             if phase2_available:
-                report_manager = ReportManager(findings, scan_info)
-                report_content = report_manager.generate_technical_report()
+                try:
+                    from enhanced_reporting import ReportManager
+                    report_manager = ReportManager(findings, scan_info)
+                    report_content = report_manager.generate_technical_report()
+                except ImportError:
+                    # Fall back to Phase 1 JSON generation
+                    report_content = engine.generate_report('json')
             else:
                 # Use original JSON generation
                 report_content = engine.generate_report('json')
@@ -838,7 +898,10 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                         f.write(report_content)
                     else:
                         json.dump(report_content, f, indent=2, default=str)
-                console.print(f"JSON report saved to {output}", style="green")
+                if RICH_AVAILABLE:
+                    console.print(f"JSON report saved to {output}", style="green")
+                else:
+                    print(f"JSON report saved to {output}")
             else:
                 if isinstance(report_content, str):
                     print(report_content)
@@ -847,67 +910,109 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         
         elif output_format == 'html':
             if not phase2_available:
-                console.print("❌ HTML format requires Phase 2 components", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ HTML format requires Phase 2 components", style="red")
+                else:
+                    print("❌ HTML format requires Phase 2 components")
                 sys.exit(1)
             
             # HTML output (Phase 2)
+            from enhanced_reporting import HTMLReporter
             html_reporter = HTMLReporter(findings, scan_info)
             output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
             html_reporter.generate_report(output_file)
-            console.print(f"HTML report saved to {output_file}", style="green")
+            if RICH_AVAILABLE:
+                console.print(f"HTML report saved to {output_file}", style="green")
+            else:
+                print(f"HTML report saved to {output_file}")
         
         elif output_format == 'compliance':
             if not phase2_available:
-                console.print("❌ Compliance format requires Phase 2 components", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ Compliance format requires Phase 2 components", style="red")
+                else:
+                    print("❌ Compliance format requires Phase 2 components")
                 sys.exit(1)
             
             # Compliance output (Phase 2)
+            from enhanced_reporting import ComplianceMapper
             compliance_mapper = ComplianceMapper()
             compliance_report = compliance_mapper.generate_compliance_report(findings)
             output_file = output or f"vigileguard_compliance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             
             with open(output_file, 'w') as f:
                 json.dump(compliance_report, f, indent=2, default=str)
-            console.print(f"Compliance report saved to {output_file}", style="green")
+            if RICH_AVAILABLE:
+                console.print(f"Compliance report saved to {output_file}", style="green")
+            else:
+                print(f"Compliance report saved to {output_file}")
         
         elif output_format == 'all':
             if not phase2_available:
-                console.print("❌ 'all' format requires Phase 2 components", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ 'all' format requires Phase 2 components", style="red")
+                else:
+                    print("❌ 'all' format requires Phase 2 components")
                 sys.exit(1)
             
             # Generate all formats (Phase 2)
+            from enhanced_reporting import ReportManager
             report_manager = ReportManager(findings, scan_info)
             output_dir = output or './reports'
             generated_files = report_manager.generate_all_formats(output_dir)
             
-            console.print("📊 All reports generated:", style="bold green")
-            for format_type, file_path in generated_files.items():
-                console.print(f"  {format_type.upper()}: {file_path}")
+            if RICH_AVAILABLE:
+                console.print("📊 All reports generated:", style="bold green")
+                for format_type, file_path in generated_files.items():
+                    console.print(f"  {format_type.upper()}: {file_path}")
+            else:
+                print("📊 All reports generated:")
+                for format_type, file_path in generated_files.items():
+                    print(f"  {format_type.upper()}: {file_path}")
         
         # Send notifications if enabled (Phase 2)
         if notifications and phase2_available:
             try:
-                engine.notification_manager.send_notifications(findings, scan_info)
-                console.print("📧 Notifications sent", style="green")
+                if hasattr(engine, 'notification_manager'):
+                    engine.notification_manager.send_notifications(findings, scan_info)
+                    if RICH_AVAILABLE:
+                        console.print("📧 Notifications sent", style="green")
+                    else:
+                        print("📧 Notifications sent")
             except Exception as e:
-                console.print(f"⚠️ Notification failed: {e}", style="yellow")
+                if RICH_AVAILABLE:
+                    console.print(f"⚠️ Notification failed: {e}", style="yellow")
+                else:
+                    print(f"⚠️ Notification failed: {e}")
         
         # Exit with appropriate code
         critical_high_count = sum(1 for f in findings 
                                 if f.severity in [SeverityLevel.CRITICAL, SeverityLevel.HIGH])
         
         if critical_high_count > 0:
-            console.print(f"\n⚠️  Found {critical_high_count} critical/high severity issues", style="red")
+            if RICH_AVAILABLE:
+                console.print(f"\n⚠️  Found {critical_high_count} critical/high severity issues", style="red")
+            else:
+                print(f"\n⚠️  Found {critical_high_count} critical/high severity issues")
             sys.exit(1)
         else:
-            console.print(f"\n✅ Audit completed successfully", style="green")
+            if RICH_AVAILABLE:
+                console.print(f"\n✅ Audit completed successfully", style="green")
+            else:
+                print(f"\n✅ Audit completed successfully")
             sys.exit(0)
             
     except KeyboardInterrupt:
-        console.print("\n❌ Audit interrupted by user", style="red")
+        if RICH_AVAILABLE:
+            console.print("\n❌ Audit interrupted by user", style="red")
+        else:
+            print("\n❌ Audit interrupted by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n❌ Error during audit: {e}", style="red")
+        if RICH_AVAILABLE:
+            console.print(f"\n❌ Error during audit: {e}", style="red")
+        else:
+            print(f"\n❌ Error during audit: {e}")
         if debug:
             import traceback
             traceback.print_exc()
