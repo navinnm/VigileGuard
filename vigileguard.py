@@ -35,13 +35,16 @@ except ImportError:
     print("Install with: pip install click rich")
     sys.exit(1)
 
+# Phase 2 dependencies (optional)
 try:
     from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
     from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
     from phase2_integration import ConfigurationManager, NotificationManager
     PHASE2_ENABLED = True
-except ImportError:
+    print("✅ Phase 2 components loaded successfully")
+except ImportError as e:
     PHASE2_ENABLED = False
+    print(f"⚠️ Phase 2 components not available: {e}")
 
 except ImportError:
     print("Error: Required dependencies not installed.")
@@ -297,16 +300,6 @@ class UserAccountChecker(SecurityChecker):
                 description="Insufficient permissions to check for empty passwords",
                 recommendation="Run VigileGuard with appropriate privileges"
             )
-
-    def _get_scan_info(self) -> Dict[str, Any]:
-        """Get scan information dictionary"""
-        return {
-            'timestamp': datetime.now().isoformat(),
-            'tool': 'VigileGuard',
-            'version': '2.0.0',
-            'hostname': platform.node(),
-            'repository': 'https://github.com/navinnm/VigileGuard'
-        }
     
     def _check_duplicate_uids(self):
         """Check for duplicate UIDs"""
@@ -631,7 +624,17 @@ class AuditEngine:
                 WebServerSecurityChecker(),
                 NetworkSecurityChecker()
             ])
-    
+
+    def _get_scan_info(self) -> Dict[str, Any]:
+        """Get scan information dictionary"""
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'tool': 'VigileGuard',
+            'version': '2.0.0' if PHASE2_ENABLED else '1.0.5',
+            'hostname': platform.node(),
+            'repository': 'https://github.com/navinnm/VigileGuard'
+        }
+        
     def _load_config(self, config_file: Optional[str]) -> Dict[str, Any]:
         """Load configuration from file or use defaults"""
         default_config = {
