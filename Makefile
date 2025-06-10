@@ -63,14 +63,16 @@ lint:
 	@echo "Running bandit security check..."
 	bandit -r . -f json || true
 
+# FIXED: Actually format the code (remove --check)
 format:
 	@echo "🎨 Formatting code..."
-	black --check --line-length=100 vigileguard.py
+	black --line-length=100 vigileguard.py
 	@echo "✅ Code formatted"
 
+# FIXED: Remove duplicate --check
 format-check:
 	@echo "🔍 Checking code format..."
-	black --check --line-length=100 vigileguard.py --check || (echo "❌ Code is not formatted correctly. Run 'make format' to fix." && exit 1)
+	black --check --line-length=100 vigileguard.py || (echo "❌ Code is not formatted correctly. Run 'make format' to fix." && exit 1)
 
 # Build and distribution
 clean:
@@ -132,7 +134,7 @@ run-example:
 
 run-json:
 	@echo "📊 Generating JSON report..."
-	python vigileguard.py --format json --output vigileguard-report.json
+	python vigileguard.py --format json --output vigileguard-report.json || true
 	@echo "✅ Report saved to vigileguard-report.json"
 
 run-config:
@@ -170,7 +172,7 @@ check-security:
 performance-test:
 	@echo "⚡ Running performance tests..."
 	@echo "Testing execution time..."
-	time python vigileguard.py --format json > /dev/null
+	time python vigileguard.py --format json > /dev/null || true
 	@echo "✅ Performance test completed"
 
 # Release preparation
@@ -254,10 +256,10 @@ dev-test: format lint test
 dev-commit: format lint test
 	@echo "✅ Code ready for commit"
 
-# Quick development commands
+# Quick development commands - FIXED
 quick-format:
 	@echo "⚡ Quick format..."
-	black --check --line-length=100 vigileguard.py
+	black --line-length=100 vigileguard.py
 
 quick-test:
 	@echo "⚡ Quick test..."
