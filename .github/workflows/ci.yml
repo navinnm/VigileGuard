@@ -295,7 +295,7 @@ jobs:
           # Run Trivy scan with error handling
           trivy image --format sarif --output docker-trivy-results.sarif vigileguard:test || {
             echo "⚠️ Trivy scan failed, creating empty SARIF file"
-            cat > docker-trivy-results.sarif << 'EOF'
+            cat > docker-trivy-results.sarif << 'EOFMARKER'
             {
               "version": "2.1.0",
               "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
@@ -312,7 +312,7 @@ jobs:
                 }
               ]
             }
-            EOF
+            EOFMARKER
           }
           
           # Verify SARIF file exists and is valid
