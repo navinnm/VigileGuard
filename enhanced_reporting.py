@@ -756,9 +756,14 @@ class ComplianceMapper:
 class TrendTracker:
     """Track security trends over time"""
     
-    def __init__(self, storage_path: str = "/var/lib/vigileguard/trends"):
+    def __init__(self, storage_path: str = "./vigileguard_trends"):
         self.storage_path = Path(storage_path)
-        self.storage_path.mkdir(parents=True, exist_ok=True)
+        try:
+            self.storage_path.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            # Fallback to current directory if we can't create the preferred path
+            self.storage_path = Path("./trends")
+            self.storage_path.mkdir(parents=True, exist_ok=True)
     
     def record_scan(self, findings: List[Finding], scan_info: Dict[str, Any]) -> str:
         """Record scan results for trend analysis"""
