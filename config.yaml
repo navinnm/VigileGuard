@@ -1,4 +1,5 @@
-# SecurePulse Configuration File
+# VigileGuard Configuration File
+# Repository: https://github.com/navinnm/VigileGuard
 # This file controls the behavior of security audits
 
 # Output configuration
@@ -22,6 +23,7 @@ excluded_paths:
   - "/var/tmp"
   - "/proc"
   - "/sys"
+  - "/dev"
 
 # Custom rules for file permission checks
 file_permission_rules:
@@ -31,25 +33,36 @@ file_permission_rules:
       mode: "0644"
       owner: "root"
       group: "root"
-    "/etc/ssh/ssh_host_*_key":
+    "/etc/ssh/ssh_host_rsa_key":
+      mode: "0600"
+      owner: "root" 
+      group: "root"
+    "/etc/ssh/ssh_host_ecdsa_key":
+      mode: "0600"
+      owner: "root"
+      group: "root"
+    "/etc/ssh/ssh_host_ed25519_key":
       mode: "0600"
       owner: "root"
       group: "root"
 
 # SSH configuration checks
 ssh_checks:
-  # Required settings
+  # Required settings for security
   required_settings:
     PermitRootLogin: "no"
     PasswordAuthentication: "no"
     PermitEmptyPasswords: "no"
     Protocol: "2"
   
-  # Recommended but not critical
+  # Recommended but not critical settings
   recommended_settings:
     Port: "22"  # Default port warning level
     MaxAuthTries: "3"
     ClientAliveInterval: "300"
+    ClientAliveCountMax: "2"
+    X11Forwarding: "no"
+    AllowTcpForwarding: "no"
 
 # User account checks
 user_account_checks:
@@ -58,10 +71,18 @@ user_account_checks:
     - "sync"
     - "shutdown" 
     - "halt"
+    - "games"
+    - "ftp"
   
   # UIDs that can be duplicated (usually 0 for root)
   allowed_duplicate_uids:
     - "0"
+  
+  # Minimum password age (days)
+  min_password_age: 1
+  
+  # Maximum password age (days) 
+  max_password_age: 90
 
 # Service checks
 service_checks:
@@ -70,12 +91,54 @@ service_checks:
     telnet: "CRITICAL"
     rsh: "CRITICAL"
     rlogin: "CRITICAL"
+    rexec: "CRITICAL"
     ftp: "HIGH"
     tftp: "HIGH"
     finger: "MEDIUM"
     echo: "LOW"
     chargen: "LOW"
     discard: "LOW"
+    daytime: "LOW"
+    time: "LOW"
+  
+  # Services that should be running (warnings if not found)
+  required_services:
+    - "ssh"
+    - "systemd"
+
+# File system checks
+filesystem_checks:
+  # Maximum allowed file size (bytes) in sensitive directories
+  max_file_size_sensitive_dirs: 104857600  # 100MB
+  
+  # Directories to check for unusual files
+  sensitive_directories:
+    - "/etc"
+    - "/root"
+    - "/boot"
+  
+  # File extensions that shouldn't exist in system directories
+  suspicious_extensions:
+    - ".tmp"
+    - ".bak" 
+    - ".old"
+    - ".orig"
+    - ".rej"
+
+# Network security checks
+network_checks:
+  # Ports that should not be open externally
+  dangerous_ports:
+    - 23    # Telnet
+    - 512   # rexec
+    - 513   # rlogin  
+    - 514   # rsh
+    - 515   # printer
+    - 111   # portmapper
+    - 2049  # NFS
+  
+  # Maximum number of open ports before warning
+  max_open_ports: 10
 
 # Reporting options
 reporting:
@@ -90,6 +153,12 @@ reporting:
   
   # Show only failed checks (hide INFO level)
   show_only_issues: false
+  
+  # Include configuration details in JSON reports
+  include_config_details: false
+  
+  # Maximum number of items to show in details
+  max_detail_items: 20
 
 # Advanced options
 advanced:
@@ -101,3 +170,76 @@ advanced:
   
   # Enable verbose logging
   verbose: false
+  
+  # Parallel processing (experimental)
+  enable_parallel: false
+  
+  # Maximum number of worker threads
+  max_workers: 4
+
+# Compliance frameworks (future use)
+compliance:
+  # CIS Controls mapping
+  cis_controls: true
+  
+  # PCI DSS requirements
+  pci_dss: false
+  
+  # SOC 2 Type II
+  soc2: false
+  
+  # NIST Cybersecurity Framework
+  nist_csf: false
+
+# Custom rules (extensible)
+custom_rules:
+  # Example custom rule
+  example_rule:
+    enabled: false
+    description: "Example custom security rule"
+    severity: "MEDIUM"
+    command: "echo 'Custom check'"
+    expected_output: ""
+    
+# Plugin configuration (for future extensions)
+plugins:
+  # Web server plugins
+  apache_plugin:
+    enabled: false
+    config_path: "/etc/apache2/apache2.conf"
+  
+  nginx_plugin:
+    enabled: false
+    config_path: "/etc/nginx/nginx.conf"
+  
+  # Database plugins
+  mysql_plugin:
+    enabled: false
+    config_path: "/etc/mysql/mysql.conf.d/mysqld.cnf"
+  
+  postgresql_plugin:
+    enabled: false
+    config_path: "/etc/postgresql/*/main/postgresql.conf"
+
+# Notification settings (future use)
+notifications:
+  # Email notifications
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    recipients: []
+  
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#security"
+  
+  # Webhook notifications
+  webhook:
+    enabled: false
+    url: ""
+    auth_token: ""

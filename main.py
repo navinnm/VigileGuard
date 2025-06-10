@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-SecurePulse - Linux Security Audit Tool (Phase 1)
+VigileGuard - Linux Security Audit Tool (Phase 1)
 A comprehensive security audit tool for Linux systems
 
-Author: SecurePulse Development Team
+Repository: https://github.com/navinnm/VigileGuard
+Author: VigileGuard Development Team
 License: MIT
 Version: 1.0.0
 """
@@ -268,7 +269,7 @@ class UserAccountChecker(SecurityChecker):
                 severity=SeverityLevel.INFO,
                 title="Cannot read /etc/shadow",
                 description="Insufficient permissions to check for empty passwords",
-                recommendation="Run SecurePulse with appropriate privileges"
+                recommendation="Run VigileGuard with appropriate privileges"
             )
     
     def _check_duplicate_uids(self):
@@ -309,12 +310,6 @@ class UserAccountChecker(SecurityChecker):
             returncode, stdout, stderr = self.run_command(cmd)
             
             # Check for dangerous sudo configurations
-            dangerous_patterns = [
-                'ALL=(ALL:ALL) NOPASSWD:ALL',
-                'ALL=(ALL) NOPASSWD:ALL',
-                '%sudo ALL=(ALL:ALL) NOPASSWD:ALL'
-            ]
-            
             try:
                 # This requires appropriate permissions
                 cmd = "grep -E '(NOPASSWD:ALL|%.*ALL.*NOPASSWD)' /etc/sudoers /etc/sudoers.d/* 2>/dev/null || true"
@@ -615,7 +610,7 @@ class AuditEngine:
     
     def run_audit(self) -> List[Finding]:
         """Run all security checks"""
-        console.print(Panel.fit("🔒 SecurePulse Security Audit", style="bold blue"))
+        console.print(Panel.fit("🛡️ VigileGuard Security Audit", style="bold blue"))
         console.print(f"Starting audit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         console.print()
         
@@ -701,9 +696,10 @@ class AuditEngine:
         report = {
             "scan_info": {
                 "timestamp": datetime.now().isoformat(),
-                "tool": "SecurePulse",
+                "tool": "VigileGuard",
                 "version": "1.0.0",
-                "hostname": platform.node()
+                "hostname": platform.node(),
+                "repository": "https://github.com/navinnm/VigileGuard"
             },
             "summary": {
                 "total_findings": len(self.all_findings),
@@ -728,13 +724,15 @@ class AuditEngine:
 @click.version_option(version='1.0.0')
 def main(config: Optional[str], output: Optional[str], output_format: str, debug: bool):
     """
-    SecurePulse - Linux Security Audit Tool
+    VigileGuard - Linux Security Audit Tool
     
     Performs comprehensive security audits of Linux systems including:
     - File permission analysis
     - User account security checks  
     - SSH configuration review
     - System information gathering
+    
+    Repository: https://github.com/navinnm/VigileGuard
     """
     try:
         # Initialize audit engine

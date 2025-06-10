@@ -1,12 +1,14 @@
-# SecurePulse Docker Image
+# VigileGuard Docker Image
+# Repository: https://github.com/navinnm/VigileGuard
 # Lightweight container for running security audits
 
 FROM python:3.11-slim
 
 # Metadata
-LABEL maintainer="SecurePulse Team <security@yourcompany.com>"
-LABEL description="SecurePulse - Linux Security Audit Tool"
+LABEL maintainer="VigileGuard Team <https://github.com/navinnm/VigileGuard>"
+LABEL description="VigileGuard - Linux Security Audit Tool"
 LABEL version="1.0.0"
+LABEL repository="https://github.com/navinnm/VigileGuard"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,11 +18,14 @@ RUN apt-get update && apt-get install -y \
     procps \
     net-tools \
     openssh-client \
+    findutils \
+    grep \
+    coreutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN useradd -m -s /bin/bash securepulse && \
-    echo "securepulse ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN useradd -m -s /bin/bash vigileguard && \
+    echo "vigileguard ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Set working directory
 WORKDIR /app
@@ -31,36 +36,51 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application files
+COPY vigileguard.py .
+COPY config.yaml .
 
-# Install SecurePulse
-RUN pip install -e .
+# Create config directory and copy config
+RUN mkdir -p /etc/vigileguard && \
+    cp config.yaml /etc/vigileguard/ && \
+    chown -R vigileguard:vigileguard /etc/vigileguard
 
-# Create config directory
-RUN mkdir -p /etc/securepulse && \
-    cp config.yaml /etc/securepulse/ && \
-    chown -R securepulse:securepulse /etc/securepulse
+# Create a simple wrapper script
+RUN echo '#!/bin/bash\npython /app/vigileguard.py "$@"' > /usr/local/bin/vigileguard && \
+    chmod +x /usr/local/bin/vigileguard
 
 # Switch to non-root user
-USER securepulse
+USER vigileguard
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV SECUREPULSE_CONFIG=/etc/securepulse/config.yaml
+ENV VIGILEGUARD_CONFIG=/etc/vigileguard/config.yaml
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD securepulse --help > /dev/null || exit 1
+    CMD vigileguard --help > /dev/null || exit 1
 
 # Default command
-ENTRYPOINT ["securepulse"]
+ENTRYPOINT ["vigileguard"]
 CMD ["--help"]
 
-# Build instructions:
-# docker build -t securepulse:latest .
-# 
-# Usage examples:
-# docker run --rm securepulse:latest
-# docker run --rm -v /host/path:/data securepulse:latest --output /data/report.json --format json
-# docker run --rm -it securepulse:latest --config /etc/securepulse/config.yaml
+# Build and usage instructions:
+#
+# Build the image:
+#   docker build -t vigileguard:latest .
+#
+# Basic usage:
+#   docker run --rm vigileguard:latest
+#   docker run --rm vigileguard:latest --format json
+#
+# Mount host filesystem for scanning:
+#   docker run --rm -v /:/host:ro vigileguard:latest --config /etc/vigileguard/config.yaml
+#
+# Save report to host:
+#   docker run --rm -v $(pwd):/output vigileguard:latest --format json --output /output/report.json
+#
+# Interactive mode:
+#   docker run --rm -it vigileguard:latest /bin/bash
+#
+# Custom configuration:
+#   docker run --rm -v $(pwd)/custom-config.yaml:/etc/vigileguard/config.yaml vigileguard:latest
