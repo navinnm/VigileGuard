@@ -24,17 +24,25 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 # Import rich components with error handling
+RICH_AVAILABLE = True
 try:
     import click
     from rich.console import Console
     from rich.table import Table
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
-    RICH_AVAILABLE = True
-except ImportError:
-    print("Error: Required dependencies not installed.")
-    print("Install with: pip install click rich")
-    sys.exit(1)
+except ImportError as e:
+    RICH_AVAILABLE = False
+    print(f"Warning: Rich library not available ({e}). Using fallback mode.")
+    # Define minimal fallback classes
+    class Console:
+        def print(self, *args, **kwargs):
+            print(*args)
+    
+    class Panel:
+        @staticmethod
+        def fit(text, **kwargs):
+            return text
 
 __version__ = "1.0.5"
 
