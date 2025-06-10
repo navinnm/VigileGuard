@@ -21,7 +21,7 @@ try:
     )
 except ImportError:
     # If running as standalone script
-    from main import (
+    from vigileguard import (
         FilePermissionChecker, UserAccountChecker, SSHConfigChecker,
         SystemInfoChecker, AuditEngine, SeverityLevel, Finding
     )
