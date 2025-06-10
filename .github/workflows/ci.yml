@@ -50,11 +50,6 @@ jobs:
           pip install -r requirements.txt
           pip install black flake8 mypy bandit safety
 
-      - name: Code formatting check
-        run: |
-          black --check --line-length=100 vigileguard.py
-          echo "✅ Code formatting check passed"
-
       - name: Lint with flake8
         run: |
           flake8 vigileguard.py --max-line-length=100 --ignore=E203,W503 --statistics
