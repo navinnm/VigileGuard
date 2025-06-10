@@ -1,0 +1,103 @@
+# SecurePulse Configuration File
+# This file controls the behavior of security audits
+
+# Output configuration
+output_format: "console"  # Options: console, json
+severity_filter: "INFO"   # Minimum severity to report: CRITICAL, HIGH, MEDIUM, LOW, INFO
+
+# Checks to exclude (by class name)
+excluded_checks: []
+# Example:
+# excluded_checks:
+#   - "FilePermissionChecker"
+#   - "SSHConfigChecker"
+
+# Custom severity overrides for specific findings
+severity_overrides:
+  "SSH running on default port": "INFO"  # Override default severity
+  
+# File paths to exclude from checks
+excluded_paths:
+  - "/tmp"
+  - "/var/tmp"
+  - "/proc"
+  - "/sys"
+
+# Custom rules for file permission checks
+file_permission_rules:
+  # Additional sensitive files to check
+  sensitive_files:
+    "/etc/crontab":
+      mode: "0644"
+      owner: "root"
+      group: "root"
+    "/etc/ssh/ssh_host_*_key":
+      mode: "0600"
+      owner: "root"
+      group: "root"
+
+# SSH configuration checks
+ssh_checks:
+  # Required settings
+  required_settings:
+    PermitRootLogin: "no"
+    PasswordAuthentication: "no"
+    PermitEmptyPasswords: "no"
+    Protocol: "2"
+  
+  # Recommended but not critical
+  recommended_settings:
+    Port: "22"  # Default port warning level
+    MaxAuthTries: "3"
+    ClientAliveInterval: "300"
+
+# User account checks
+user_account_checks:
+  # Accounts that are allowed to have empty passwords (system accounts)
+  allowed_empty_password_accounts:
+    - "sync"
+    - "shutdown" 
+    - "halt"
+  
+  # UIDs that can be duplicated (usually 0 for root)
+  allowed_duplicate_uids:
+    - "0"
+
+# Service checks
+service_checks:
+  # Services considered risky if running
+  risky_services:
+    telnet: "CRITICAL"
+    rsh: "CRITICAL"
+    rlogin: "CRITICAL"
+    ftp: "HIGH"
+    tftp: "HIGH"
+    finger: "MEDIUM"
+    echo: "LOW"
+    chargen: "LOW"
+    discard: "LOW"
+
+# Reporting options
+reporting:
+  # Include system information in reports
+  include_system_info: true
+  
+  # Include remediation steps
+  include_remediation: true
+  
+  # Group findings by category
+  group_by_category: true
+  
+  # Show only failed checks (hide INFO level)
+  show_only_issues: false
+
+# Advanced options
+advanced:
+  # Timeout for individual commands (seconds)
+  command_timeout: 30
+  
+  # Maximum number of files to check in each category
+  max_files_per_check: 100
+  
+  # Enable verbose logging
+  verbose: false
