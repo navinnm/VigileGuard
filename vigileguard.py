@@ -118,7 +118,10 @@ class FilePermissionChecker(SecurityChecker):
 
     def check(self) -> List[Finding]:
         """Run file permission checks"""
-        console.print("🔍 Checking file permissions...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("🔍 Checking file permissions...", style="yellow")
+        else:
+            print("🔍 Checking file permissions...")
 
         # Check world-writable files
         self._check_world_writable_files()
@@ -249,7 +252,10 @@ class UserAccountChecker(SecurityChecker):
     
     def check(self) -> List[Finding]:
         """Run user account security checks"""
-        console.print("👥 Checking user accounts...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("👥 Checking user accounts...", style="yellow")
+        else:
+            print("👥 Checking user accounts...")
         
         # Check for accounts with empty passwords
         self._check_empty_passwords()
@@ -383,7 +389,10 @@ class SSHConfigChecker(SecurityChecker):
     
     def check(self) -> List[Finding]:
         """Run SSH configuration checks"""
-        console.print("🔑 Checking SSH configuration...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("🔑 Checking SSH configuration...", style="yellow")
+        else:
+            print("🔑 Checking SSH configuration...")
         
         if not os.path.exists('/etc/ssh/sshd_config'):
             self.add_finding(
@@ -497,7 +506,10 @@ class SystemInfoChecker(SecurityChecker):
     
     def check(self) -> List[Finding]:
         """Run system information checks"""
-        console.print("💻 Gathering system information...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("💻 Gathering system information...", style="yellow")
+        else:
+            print("💻 Gathering system information...")
         
         self._check_os_version()
         self._check_kernel_version()
@@ -617,10 +629,16 @@ class AuditEngine:
                 WebServerSecurityChecker(),
                 NetworkSecurityChecker()
             ])
-            console.print("✅ Phase 2 components loaded successfully", style="green")
+            if RICH_AVAILABLE:
+                console.print("✅ Phase 2 components loaded successfully", style="green")
+            else:
+                print("✅ Phase 2 components loaded successfully")
             self.phase2_available = True
         except ImportError as e:
-            console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
+            if RICH_AVAILABLE:
+                console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
+            else:
+                print(f"⚠️ Phase 2 components not available: {e}")
 
     def _get_scan_info(self) -> Dict[str, Any]:
         """Get scan information dictionary"""
@@ -651,7 +669,10 @@ class AuditEngine:
                 if custom_config is not None:  # Check for None first
                     default_config.update(custom_config)
             except Exception as e:
-                console.print(f"Warning: Could not load config file: {e}", style="yellow")
+                if RICH_AVAILABLE:
+                    console.print(f"Warning: Could not load config file: {e}", style="yellow")
+                else:
+                    print(f"Warning: Could not load config file: {e}")
         
         return default_config
     
@@ -707,7 +728,10 @@ class AuditEngine:
                 html_reporter = HTMLReporter(self.all_findings, self._get_scan_info())
                 return html_reporter.generate_report("report.html")
             except ImportError:
-                console.print("❌ HTML format requires Phase 2 components", style="red")
+                if RICH_AVAILABLE:
+                    console.print("❌ HTML format requires Phase 2 components", style="red")
+                else:
+                    print("❌ HTML format requires Phase 2 components")
                 return ""
         else:
             return self._generate_console_report()
