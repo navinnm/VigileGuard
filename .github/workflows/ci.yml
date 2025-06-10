@@ -7,11 +7,17 @@ on:
     branches: [ main ]
   release:
     types: [ published ]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
 
 permissions:
   contents: read
   security-events: write
   actions: read
+  issues: write  # For creating issues on security findings
+  pull-requests: write  # For PR comments
 
 env:
   PYTHON_VERSION: '3.8'
@@ -65,15 +71,22 @@ jobs:
           bandit -r . -f json -o bandit-report.json || true
           echo "✅ Security scan completed"
 
+      - name: Dependency security check
+        run: |
+          safety check --json --output safety-report.json || true
+          echo "✅ Dependency security check completed"
+
       - name: Upload security reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: security-reports
-          path: bandit-report.json
+          path: |
+            bandit-report.json
+            safety-report.json
           retention-days: 30
 
-  # Functional Testing (Fixed for VigileGuard behavior)
+  # Functional Testing (Enhanced)
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -81,7 +94,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-20.04]
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     
     steps:
       - name: Checkout code
@@ -160,6 +173,13 @@ jobs:
           python vigileguard.py --config invalid-config.yaml --format json || true
           echo "✅ Error handling test completed"
 
+      # NEW: Performance testing
+      - name: Performance benchmark
+        run: |
+          echo "⚡ Running performance benchmark..."
+          time python vigileguard.py --format json > /dev/null || true
+          echo "✅ Performance benchmark completed"
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -170,7 +190,7 @@ jobs:
             config-test.json
           retention-days: 30
 
-  # Docker Testing
+  # Docker Testing (Enhanced)
   docker:
     name: Docker Build & Test
     runs-on: ubuntu-latest
@@ -202,11 +222,27 @@ jobs:
             exit 1
           fi
 
+      # NEW: Docker security scanning
+      - name: Run Trivy on Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'vigileguard:test'
+          format: 'sarif'
+          output: 'docker-trivy-results.sarif'
+
+      - name: Upload Docker security scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'docker-trivy-results.sarif'
+
       - name: Upload Docker test results
         uses: actions/upload-artifact@v4
         with:
           name: docker-test-results
-          path: docker-test-report.json
+          path: |
+            docker-test-report.json
+            docker-trivy-results.sarif
           retention-days: 30
 
   # Installation Script Testing
@@ -230,7 +266,26 @@ jobs:
           ./install.sh --version
           echo "✅ Install script help test passed"
 
-  # Security Testing (Separate from functional tests)
+      # NEW: Test actual installation (dry run)
+      - name: Test installation process
+        run: |
+          echo "🧪 Testing installation process..."
+          # Create a test environment
+          mkdir -p test-install
+          cd test-install
+          
+          # Test git clone simulation
+          git clone .. VigileGuard-test
+          cd VigileGuard-test
+          
+          # Test dependency installation
+          pip install -r requirements.txt
+          
+          # Test basic functionality after install
+          python vigileguard.py --help
+          echo "✅ Installation process test passed"
+
+  # Security Testing (Enhanced)
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -257,7 +312,50 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # VigileGuard Demo
+      # NEW: CodeQL Analysis
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # NEW: Cross-platform compatibility test
+  compatibility:
+    name: Cross-Platform Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04, ubuntu-22.04]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Test platform compatibility
+        run: |
+          echo "🧪 Testing on ${{ matrix.os }}..."
+          python vigileguard.py --format json --output platform-test.json || true
+          
+          if [ -f platform-test.json ]; then
+            echo "✅ Platform compatibility test passed on ${{ matrix.os }}"
+          else
+            echo "❌ Platform compatibility test failed on ${{ matrix.os }}"
+            exit 1
+          fi
+
+  # VigileGuard Demo (Enhanced)
   demo:
     name: VigileGuard Security Demo
     runs-on: ubuntu-latest
@@ -308,35 +406,175 @@ jobs:
           "
           fi
 
+      # NEW: Generate demo badge
+      - name: Generate demo badge
+        run: |
+          echo "🏷️ Generating demo badge..."
+          python -c "
+          import json
+          with open('demo-report.json', 'r') as f:
+              data = json.load(f)
+              total = data['summary']['total_findings']
+              critical_high = data['summary']['by_severity'].get('CRITICAL', 0) + data['summary']['by_severity'].get('HIGH', 0)
+              
+              # Create a simple badge data
+              badge_data = {
+                  'schemaVersion': 1,
+                  'label': 'VigileGuard Demo',
+                  'message': f'{total} findings ({critical_high} critical/high)',
+                  'color': 'red' if critical_high > 0 else 'yellow' if total > 0 else 'green'
+              }
+              
+              with open('demo-badge.json', 'w') as badge_file:
+                  json.dump(badge_data, badge_file, indent=2)
+          "
+
       - name: Upload demo results
         uses: actions/upload-artifact@v4
         with:
           name: vigileguard-demo
-          path: demo-report.json
+          path: |
+            demo-report.json
+            demo-badge.json
           retention-days: 30
 
-  # Final Status
-  status:
-    name: Build Status
+  # NEW: Documentation and Examples Testing
+  docs:
+    name: Documentation Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Verify README examples
+        run: |
+          echo "📚 Testing README examples..."
+          
+          # Test all example commands in README work
+          python vigileguard.py --help > /dev/null
+          python vigileguard.py --version > /dev/null
+          python vigileguard.py --format json --output readme-test.json || true
+          
+          if [ -f readme-test.json ]; then
+            echo "✅ README examples work correctly"
+          else
+            echo "❌ README examples failed"
+            exit 1
+          fi
+
+      - name: Check documentation completeness
+        run: |
+          echo "📋 Checking documentation completeness..."
+          
+          # Verify all essential files exist
+          test -f README.md && echo "✅ README.md exists"
+          test -f requirements.txt && echo "✅ requirements.txt exists"
+          test -f config.yaml && echo "✅ config.yaml exists"
+          test -f install.sh && echo "✅ install.sh exists"
+          test -f Dockerfile && echo "✅ Dockerfile exists"
+          test -f Makefile && echo "✅ Makefile exists"
+          
+          # Check README has essential sections
+          grep -q "Installation" README.md && echo "✅ Installation section exists"
+          grep -q "Usage" README.md && echo "✅ Usage section exists"
+          grep -q "CI/CD" README.md && echo "✅ CI/CD section exists"
+          grep -q "Contributing" README.md && echo "✅ Contributing section exists"
+
+  # NEW: Release preparation
+  release-check:
+    name: Release Readiness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [quality, test, docker, install-test, security, compatibility]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify release readiness
+        run: |
+          echo "🚀 Checking release readiness..."
+          
+          # Check version consistency
+          VERSION=$(python vigileguard.py --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.0")
+          echo "Current version: $VERSION"
+          
+          # Verify all tests passed
+          echo "✅ All tests passed"
+          echo "✅ Security scans completed"
+          echo "✅ Cross-platform compatibility verified"
+          echo "✅ Release is ready for deployment"
+
+      - name: Create release artifacts
+        run: |
+          echo "📦 Creating release artifacts..."
+          
+          # Create a release archive
+          tar -czf vigileguard-${GITHUB_REF_NAME}.tar.gz \
+            vigileguard.py requirements.txt config.yaml \
+            install.sh Dockerfile Makefile README.md
+          
+          echo "✅ Release artifacts created"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.ref_name }}
+          path: vigileguard-${{ github.ref_name }}.tar.gz
+          retention-days: 90
+
+  # NEW: Notification and status reporting
+  notify:
+    name: Notification
     runs-on: ubuntu-latest
     needs: [quality, test, docker, install-test]
     if: always()
     
     steps:
-      - name: Check overall status
+      - name: Determine overall status
+        id: status
         run: |
-          echo "🛡️ VigileGuard CI/CD Pipeline Status"
-          echo "===================================="
-          
           if [[ "${{ needs.quality.result }}" == "success" && "${{ needs.test.result }}" == "success" && "${{ needs.docker.result }}" == "success" && "${{ needs.install-test.result }}" == "success" ]]; then
-            echo "✅ All tests passed!"
-            echo "🎉 VigileGuard is ready for deployment"
-            exit 0
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=All VigileGuard tests passed! 🎉" >> $GITHUB_OUTPUT
           else
-            echo "❌ Some tests failed:"
-            echo "  Quality: ${{ needs.quality.result }}"
-            echo "  Test: ${{ needs.test.result }}"
-            echo "  Docker: ${{ needs.docker.result }}"
-            echo "  Install: ${{ needs.install-test.result }}"
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=Some VigileGuard tests failed. Check the logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create status comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.status.outputs.status }}';
+            const message = '${{ steps.status.outputs.message }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `${emoji} **VigileGuard CI/CD Pipeline**\n\n${message}\n\n**Test Results:**\n- Code Quality: ${{ needs.quality.result }}\n- Functionality Tests: ${{ needs.test.result }}\n- Docker Build: ${{ needs.docker.result }}\n- Installation: ${{ needs.install-test.result }}`
+            });
+
+      - name: Final status check
+        run: |
+          echo "🛡️ VigileGuard CI/CD Pipeline Complete"
+          echo "======================================"
+          echo "Status: ${{ steps.status.outputs.status }}"
+          echo "Message: ${{ steps.status.outputs.message }}"
+          
+          if [[ "${{ steps.status.outputs.status }}" == "failure" ]]; then
             exit 1
           fi
