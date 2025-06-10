@@ -65,12 +65,12 @@ lint:
 
 format:
 	@echo "🎨 Formatting code..."
-	black --line-length=100 vigileguard.py
+	black --check --line-length=100 vigileguard.py
 	@echo "✅ Code formatted"
 
 format-check:
 	@echo "🔍 Checking code format..."
-	black --line-length=100 vigileguard.py --check || (echo "❌ Code is not formatted correctly. Run 'make format' to fix." && exit 1)
+	black --check --line-length=100 vigileguard.py --check || (echo "❌ Code is not formatted correctly. Run 'make format' to fix." && exit 1)
 
 # Build and distribution
 clean:
@@ -257,7 +257,7 @@ dev-commit: format lint test
 # Quick development commands
 quick-format:
 	@echo "⚡ Quick format..."
-	black --line-length=100 vigileguard.py
+	black --check --line-length=100 vigileguard.py
 
 quick-test:
 	@echo "⚡ Quick test..."
