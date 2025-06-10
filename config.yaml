@@ -3,7 +3,7 @@
 # This file controls the behavior of security audits
 
 # Output configuration
-output_format: "console"  # Options: console, json
+output_format: "console"  # Options: console, json, html
 severity_filter: "INFO"   # Minimum severity to report: CRITICAL, HIGH, MEDIUM, LOW, INFO
 
 # Checks to exclude (by class name)
@@ -140,6 +140,53 @@ network_checks:
   # Maximum number of open ports before warning
   max_open_ports: 10
 
+# ============ PHASE 2 ADDITIONS ============
+
+# Web server configurations (NEW)
+web_servers:
+  apache:
+    config_paths: ["/etc/apache2", "/etc/httpd"]
+    security_headers_required: true
+    version_disclosure: false
+    directory_browsing: false
+  nginx:
+    config_paths: ["/etc/nginx"]
+    security_headers_required: true
+    server_tokens: false
+    autoindex: false
+
+# Enhanced network security settings (NEW)
+network:
+  firewall:
+    check_ufw: true
+    check_iptables: true
+    allowed_ports: [22, 80, 443]
+    warn_on_public_services: true
+  services:
+    dangerous_services: ["telnet", "rsh", "ftp"]
+    check_binding: true
+    require_secure_alternatives: true
+
+# Environment-specific configurations (NEW)
+environments:
+  development:
+    severity_filter: "MEDIUM"
+    excluded_checks: ["SSHConfigChecker"]
+    notifications:
+      enabled: false
+  staging:
+    severity_filter: "LOW"
+    excluded_checks: []
+    notifications:
+      enabled: false  # Can enable for staging alerts
+  production:
+    severity_filter: "INFO"
+    excluded_checks: []
+    notifications:
+      enabled: false  # Enable if you want production alerts
+
+# ============ END PHASE 2 ADDITIONS ============
+
 # Reporting options
 reporting:
   # Include system information in reports
@@ -159,6 +206,14 @@ reporting:
   
   # Maximum number of items to show in details
   max_detail_items: 20
+  
+  # PHASE 2: Enhanced reporting options (NEW)
+  formats: ["console", "json", "html"]
+  output_directory: "./reports"
+  include_trends: true
+  executive_summary: true
+  auto_archive: true
+  retention_days: 90
 
 # Advanced options
 advanced:
@@ -177,19 +232,24 @@ advanced:
   # Maximum number of worker threads
   max_workers: 4
 
-# Compliance frameworks (future use)
+# Compliance frameworks
 compliance:
   # CIS Controls mapping
   cis_controls: true
   
   # PCI DSS requirements
-  pci_dss: false
+  pci_dss: true  # CHANGED: Enable for Phase 2 compliance reports
   
   # SOC 2 Type II
-  soc2: false
+  soc2: true     # CHANGED: Enable for Phase 2 compliance reports
   
   # NIST Cybersecurity Framework
-  nist_csf: false
+  nist_csf: true # CHANGED: Enable for Phase 2 compliance reports
+  
+  # PHASE 2: Additional frameworks (NEW)
+  frameworks: ["PCI_DSS", "SOC_2", "NIST_CSF", "ISO_27001"]
+  generate_reports: true
+  mapping_detail_level: "full"
 
 # Custom rules (extensible)
 custom_rules:
@@ -200,16 +260,16 @@ custom_rules:
     severity: "MEDIUM"
     command: "echo 'Custom check'"
     expected_output: ""
-    
-# Plugin configuration (for future extensions)
+
+# Plugin configuration
 plugins:
   # Web server plugins
   apache_plugin:
-    enabled: false
+    enabled: true   # CHANGED: Enable for Phase 2 web checks
     config_path: "/etc/apache2/apache2.conf"
   
   nginx_plugin:
-    enabled: false
+    enabled: true   # CHANGED: Enable for Phase 2 web checks
     config_path: "/etc/nginx/nginx.conf"
   
   # Database plugins
@@ -221,25 +281,40 @@ plugins:
     enabled: false
     config_path: "/etc/postgresql/*/main/postgresql.conf"
 
-# Notification settings (future use)
+# Notification settings
 notifications:
   # Email notifications
   email:
-    enabled: false
-    smtp_server: ""
+    enabled: false         # Set to true if you want email alerts
+    smtp_server: ""        # e.g., "smtp.gmail.com"
     smtp_port: 587
-    username: ""
-    password: ""
-    recipients: []
+    username: ""           # Your email username
+    password: ""           # Your email password or app password
+    recipients: []         # e.g., ["admin@example.com"]
   
   # Slack notifications
   slack:
-    enabled: false
-    webhook_url: ""
+    enabled: false         # Set to true if you want Slack alerts
+    webhook_url: ""        # Your Slack webhook URL
     channel: "#security"
   
   # Webhook notifications
   webhook:
-    enabled: false
-    url: ""
+    enabled: false         # Set to true if you want webhook alerts
+    url: ""               # Your webhook endpoint
     auth_token: ""
+
+# PHASE 2: Scheduling (NEW) - Optional
+scheduling:
+  daily_scan:
+    enabled: false         # Set to true to enable daily scans
+    time: "02:00"         # Time to run (24-hour format)
+  weekly_scan:
+    enabled: false         # Set to true to enable weekly scans
+    day: 0                # Day of week (0=Sunday, 6=Saturday)
+    time: "03:00"         # Time to run
+
+# PHASE 2: Logging configuration (NEW) - Optional
+logging:
+  level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+  file: "vigileguard.log" # Log file location
