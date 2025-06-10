@@ -33,7 +33,7 @@
 
 ```bash
 # Download and install
-curl -fsSL https://github.com/yourcompany/securepulse/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/navinnm/securepulse/releases/latest/download/install.sh | bash
 
 # Or using pip
 pip install securepulse
@@ -43,7 +43,7 @@ pip install securepulse
 
 ```bash
 # Clone repository
-git clone https://github.com/yourcompany/securepulse.git
+git clone https://github.com/navinnm/securepulse.git
 cd securepulse
 
 # Install dependencies
@@ -188,7 +188,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run SecurePulse
         run: |
-          curl -fsSL https://github.com/yourcompany/securepulse/releases/latest/download/install.sh | bash
+          curl -fsSL https://github.com/navinnm/securepulse/releases/latest/download/install.sh | bash
           securepulse --format json --output security-report.json
       - name: Upload Security Report
         uses: actions/upload-artifact@v3
@@ -314,7 +314,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Development Setup
 
 ```bash
-git clone https://github.com/yourcompany/securepulse.git
+git clone https://github.com/navinnm/securepulse.git
 cd securepulse
 pip install -e ".[dev]"
 pytest tests/
@@ -327,9 +327,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 - 📖 **Documentation**: [https://securepulse.readthedocs.io/](https://securepulse.readthedocs.io/)
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/yourcompany/securepulse/issues)
-- 💬 **Community**: [GitHub Discussions](https://github.com/yourcompany/securepulse/discussions)
-- 📧 **Email**: security@yourcompany.com
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/navinnm/securepulse/issues)
+- 💬 **Community**: [GitHub Discussions](https://github.com/navinnm/securepulse/discussions)
+- 📧 **Email**: security@navinnm.com
 
 ## 🏆 Acknowledgments
 
