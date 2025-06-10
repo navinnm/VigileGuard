@@ -38,7 +38,14 @@ jobs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
       run: |
-        twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+        echo "🚀 Publishing to Test PyPI..."
+        twine upload --repository-url https://test.pypi.org/legacy/ dist/* --verbose || {
+          echo "❌ Upload failed. Common causes:"
+          echo "1. Package name 'vigileguard' already exists"
+          echo "2. Version '1.0.0' already uploaded"
+          echo "3. Try changing name to 'vigileguard-security' or increment version"
+          exit 1
+        }
         echo "✅ Published to Test PyPI"
 
     - name: Publish to PyPI
