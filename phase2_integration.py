@@ -99,63 +99,6 @@ class ConfigurationManager:
             "severity_filter": "INFO",
             "excluded_checks": [],
             
-            # Phase 2 enhancements
-            "environments": {
-                "development": {
-                    "severity_filter": "MEDIUM",
-                    "excluded_checks": ["SSH"],
-                    "notifications": {"enabled": False}
-                },
-                "staging": {
-                    "severity_filter": "LOW", 
-                    "excluded_checks": [],
-                    "notifications": {"enabled": True, "channels": ["email"]}
-                },
-                "production": {
-                    "severity_filter": "INFO",
-                    "excluded_checks": [],
-                    "notifications": {"enabled": True, "channels": ["email", "webhook", "slack"]}
-                }
-            },
-            
-            # Web server specific configurations
-            "web_servers": {
-                "apache": {
-                    "config_paths": ["/etc/apache2", "/etc/httpd"],
-                    "security_headers_required": True,
-                    "version_disclosure": False,
-                    "directory_browsing": False
-                },
-                "nginx": {
-                    "config_paths": ["/etc/nginx"],
-                    "security_headers_required": True,
-                    "server_tokens": False,
-                    "autoindex": False
-                }
-            },
-            
-            # Network security settings
-            "network": {
-                "firewall": {
-                    "check_ufw": True,
-                    "check_iptables": True,
-                    "allowed_ports": [22, 80, 443],
-                    "warn_on_public_services": True
-                },
-                "services": {
-                    "dangerous_services": ["telnet", "rsh", "ftp"],
-                    "check_binding": True,
-                    "require_secure_alternatives": True
-                }
-            },
-            
-            # Compliance frameworks
-            "compliance": {
-                "frameworks": ["PCI_DSS", "SOC_2", "NIST_CSF"],
-                "generate_reports": True,
-                "mapping_detail_level": "full"
-            },
-            
             # Reporting configuration
             "reporting": {
                 "formats": ["console", "json", "html"],
@@ -166,73 +109,24 @@ class ConfigurationManager:
                 "retention_days": 90
             },
             
-            # Notification configuration
+            # Notification configuration (disabled by default)
             "notifications": {
-                "enabled": True,
-                "channels": ["email"],
-                "severity_threshold": "HIGH",
-                "email": {
-                    "smtp_server": "localhost",
-                    "smtp_port": 587,
-                    "username": "",
-                    "password": "",
-                    "from_address": "vigileguard@example.com",
-                    "to_addresses": ["admin@example.com"],
-                    "use_tls": True
-                },
-                "webhook": {
-                    "url": "",
-                    "method": "POST",
-                    "headers": {"Content-Type": "application/json"},
-                    "timeout": 30
-                },
-                "slack": {
-                    "webhook_url": "",
-                    "channel": "#security",
-                    "username": "VigileGuard"
-                }
-            },
-            
-            # Custom rules
-            "custom_rules": {
-                "file_permissions": {
-                    "additional_sensitive_files": [],
-                    "custom_permission_checks": {}
-                },
-                "user_accounts": {
-                    "required_password_complexity": True,
-                    "max_failed_logins": 5,
-                    "account_lockout_enabled": True
-                },
-                "web_security": {
-                    "require_https": True,
-                    "check_security_headers": True,
-                    "scan_for_backups": True
-                }
-            },
-            
-            # Integration settings
-            "integrations": {
-                "syslog": {
-                    "enabled": False,
-                    "server": "localhost",
-                    "port": 514,
-                    "facility": "local0"
-                },
-                "prometheus": {
-                    "enabled": False,
-                    "metrics_port": 9090,
-                    "export_metrics": True
-                }
+                "enabled": False,
+                "email": {"enabled": False},
+                "slack": {"enabled": False},
+                "webhook": {"enabled": False}
             }
         }
         
+        # Load existing config if it exists
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, 'r') as f:
                     custom_config = yaml.safe_load(f)
                 if custom_config:
-                    default_config = self._deep_merge(default_config, custom_config)
+                    # Merge with defaults, preserving existing structure
+                    for key, value in custom_config.items():
+                        default_config[key] = value
             except Exception as e:
                 if RICH_AVAILABLE:
                     console.print(f"Warning: Error loading config: {e}", style="yellow")
@@ -354,11 +248,31 @@ class NotificationManager:
         for channel in channels:
             try:
                 if channel == 'email':
-                    self._send_email_notification(findings, scan_info)
+                    # Check if email is properly configured
+                    email_config = self.notification_config.get('email', {})
+                    if (email_config.get('smtp_server') and 
+                        email_config.get('to_addresses') and 
+                        email_config.get('from_address')):
+                        self._send_email_notification(findings, scan_info)
+                    else:
+                        self.logger.debug("Email notification skipped - not configured")
+                        
                 elif channel == 'webhook':
-                    self._send_webhook_notification(findings, scan_info)
+                    # Check if webhook is properly configured
+                    webhook_config = self.notification_config.get('webhook', {})
+                    if webhook_config.get('url') and webhook_config['url'].startswith(('http://', 'https://')):
+                        self._send_webhook_notification(findings, scan_info)
+                    else:
+                        self.logger.debug("Webhook notification skipped - not configured")
+                        
                 elif channel == 'slack':
-                    self._send_slack_notification(findings, scan_info)
+                    # Check if Slack is properly configured
+                    slack_config = self.notification_config.get('slack', {})
+                    if slack_config.get('webhook_url') and slack_config['webhook_url'].startswith(('http://', 'https://')):
+                        self._send_slack_notification(findings, scan_info)
+                    else:
+                        self.logger.debug("Slack notification skipped - not configured")
+                        
                 else:
                     self.logger.warning(f"Unknown notification channel: {channel}")
             except Exception as e:
@@ -616,12 +530,14 @@ class WebhookIntegration:
         """Send webhook with payload"""
         webhook_config = self.config.get('notifications', {}).get('webhook', {})
         
-        if not webhook_config.get('url'):
+        webhook_url = webhook_config.get('url', '')
+        if not webhook_url or not webhook_url.startswith(('http://', 'https://')):
+            self.logger.debug("Webhook skipped - no valid URL configured")
             return
         
         try:
             response = requests.post(
-                webhook_config['url'],
+                webhook_url,
                 json=payload,
                 headers=webhook_config.get('headers', {}),
                 timeout=webhook_config.get('timeout', 30)
@@ -706,8 +622,11 @@ class Phase2AuditEngine:
     def __init__(self, config_path: Optional[str] = None, environment: str = None):
         self.config_manager = ConfigurationManager(config_path)
         self.config = self.config_manager.get_environment_config(environment)
-        self.notification_manager = NotificationManager(self.config)
-        self.webhook_integration = WebhookIntegration(self.config)
+        
+        # Initialize notification manager with adapted config
+        notification_config = self._adapt_notification_config()
+        self.notification_manager = NotificationManager(notification_config)
+        self.webhook_integration = WebhookIntegration(notification_config)
         self.scheduling_manager = SchedulingManager(self.config)
         
         # Initialize checkers (Phase 1 + Phase 2)
@@ -715,15 +634,82 @@ class Phase2AuditEngine:
         self.all_findings: List[Finding] = []
         self.logger = logging.getLogger(__name__)
     
+    def _adapt_notification_config(self) -> Dict[str, Any]:
+        """Adapt existing config format to Phase 2 notification format"""
+        original_notifications = self.config.get('notifications', {})
+        
+        # Convert to Phase 2 format
+        adapted_config = {
+            'notifications': {
+                'enabled': False,  # Default to disabled to prevent errors
+                'channels': [],
+                'severity_threshold': 'HIGH',
+                'email': {
+                    'smtp_server': original_notifications.get('email', {}).get('smtp_server', ''),
+                    'smtp_port': original_notifications.get('email', {}).get('smtp_port', 587),
+                    'username': original_notifications.get('email', {}).get('username', ''),
+                    'password': original_notifications.get('email', {}).get('password', ''),
+                    'from_address': original_notifications.get('email', {}).get('username', ''),
+                    'to_addresses': original_notifications.get('email', {}).get('recipients', []),
+                    'use_tls': True
+                },
+                'webhook': {
+                    'url': original_notifications.get('webhook', {}).get('url', ''),
+                    'method': 'POST',
+                    'headers': {'Content-Type': 'application/json'},
+                    'timeout': 30
+                },
+                'slack': {
+                    'webhook_url': original_notifications.get('slack', {}).get('webhook_url', ''),
+                    'channel': original_notifications.get('slack', {}).get('channel', '#security'),
+                    'username': 'VigileGuard'
+                }
+            }
+        }
+        
+        # Enable notifications if any are configured
+        email_enabled = original_notifications.get('email', {}).get('enabled', False)
+        slack_enabled = original_notifications.get('slack', {}).get('enabled', False)
+        webhook_enabled = original_notifications.get('webhook', {}).get('enabled', False)
+        
+        if email_enabled or slack_enabled or webhook_enabled:
+            adapted_config['notifications']['enabled'] = True
+            channels = []
+            if email_enabled:
+                channels.append('email')
+            if slack_enabled:
+                channels.append('slack')
+            if webhook_enabled:
+                channels.append('webhook')
+            adapted_config['notifications']['channels'] = channels
+        
+        return adapted_config
+    
     def _initialize_checkers(self) -> List:
         """Initialize all security checkers"""
         checkers = []
         
+        # Phase 1 checkers (import from vigileguard.py)
+        try:
+            from vigileguard import FilePermissionChecker, UserAccountChecker, SSHConfigChecker, SystemInfoChecker
+            checkers.extend([
+                FilePermissionChecker(),
+                UserAccountChecker(),
+                SSHConfigChecker(),
+                SystemInfoChecker()
+            ])
+            self.logger.info("Phase 1 checkers loaded successfully")
+        except ImportError as e:
+            self.logger.warning(f"Could not import Phase 1 checkers: {e}")
+        
         # Phase 2 checkers
         try:
             from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
-            checkers.append(WebServerSecurityChecker())
-            checkers.append(NetworkSecurityChecker())
+            checkers.extend([
+                WebServerSecurityChecker(),
+                NetworkSecurityChecker()
+            ])
+            self.logger.info("Phase 2 checkers loaded successfully")
         except ImportError as e:
             self.logger.warning(f"Could not import Phase 2 checkers: {e}")
         
