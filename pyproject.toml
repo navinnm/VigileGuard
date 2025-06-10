@@ -3,10 +3,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vigileguard"
-version = "1.0.0"
+name = "vigileguard-security"
+version = "1.0.1"
 authors = [
-    {name = "VigileGuard Development Team", email = "ping@fulgid.in"},
+    {name = "VigileGuard Development Team", email = "your-email@example.com"},
 ]
 description = "A comprehensive Linux security audit tool"
 readme = "README.md"
