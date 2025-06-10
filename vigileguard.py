@@ -55,7 +55,7 @@ class Finding:
     title: str
     description: str
     recommendation: str
-    details: Dict[str, Any] = None
+    details: Optional[Dict[str, Any]] = None  
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert finding to dictionary"""
@@ -75,7 +75,8 @@ class SecurityChecker:
         raise NotImplementedError
 
     def add_finding(self, category: str, severity: SeverityLevel, title: str,
-                    description: str, recommendation: str, details: Dict = None):
+                description: str, recommendation: str, 
+                details: Optional[Dict[str, Any]] = None):
         """Add a security finding"""
         finding = Finding(
             category=category,
@@ -613,7 +614,8 @@ class AuditEngine:
                         custom_config = yaml.safe_load(f)
                     else:
                         custom_config = json.load(f)
-                default_config.update(custom_config)
+                if custom_config is not None:  # Check for None first
+                    default_config.update(custom_config)
             except Exception as e:
                 console.print(f"Warning: Could not load config file: {e}", style="yellow")
         
