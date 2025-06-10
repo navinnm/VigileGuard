@@ -51,7 +51,9 @@ cd VigileGuard
 pip install -r requirements.txt
 
 # Run VigileGuard
-python vigileguard.py
+python vigileguard.py 
+or 
+python3 vigileguard.py
 ```
 
 ### Alternative Installation Methods
@@ -81,16 +83,26 @@ docker run --rm vigileguard
 
 ```bash
 # Run basic security audit
-python vigileguard.py
+python vigileguard.py 
+or 
+python3 vigileguard.py
 
 # Generate JSON report for CI/CD
-python vigileguard.py --format json --output security-report.json
+python vigileguard.py --format json --output security-report.json 
+or
+python3 vigileguard.py --format json --output security-report.json
 
 # Use custom configuration
 python vigileguard.py --config custom-config.yaml
+or
+python3 vigileguard.py --config custom-config.yaml
+
 
 # Show help and options
 python vigileguard.py --help
+or
+python3 vigileguard.py --help
+
 ```
 
 ### Example Output
