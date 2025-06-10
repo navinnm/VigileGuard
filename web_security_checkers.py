@@ -15,8 +15,77 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-# Import from Phase 1
-from vigileguard import SecurityChecker, Finding, SeverityLevel, console
+# Import base classes and types - avoid circular import by importing directly
+try:
+    from rich.console import Console
+except ImportError:
+    print("Error: rich library not installed. Install with: pip install rich")
+    exit(1)
+
+# Create console instance
+console = Console()
+
+# Re-define required classes to avoid circular imports
+class SeverityLevel(Enum):
+    """Security finding severity levels"""
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+@dataclass
+class Finding:
+    """Represents a security finding"""
+    category: str
+    severity: SeverityLevel
+    title: str
+    description: str
+    recommendation: str
+    details: Optional[Dict[str, Any]] = None  
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert finding to dictionary"""
+        from dataclasses import asdict
+        result = asdict(self)
+        result["severity"] = self.severity.value
+        return result
+
+class SecurityChecker:
+    """Base class for all security checkers"""
+
+    def __init__(self):
+        self.findings: List[Finding] = []
+
+    def check(self) -> List[Finding]:
+        """Run the security check - to be implemented by subclasses"""
+        raise NotImplementedError
+
+    def add_finding(self, category: str, severity: SeverityLevel, title: str,
+                description: str, recommendation: str, 
+                details: Optional[Dict[str, Any]] = None):
+        """Add a security finding"""
+        finding = Finding(
+            category=category,
+            severity=severity,
+            title=title,
+            description=description,
+            recommendation=recommendation,
+            details=details or {}
+        )
+        self.findings.append(finding)
+
+    def run_command(self, command: str) -> tuple:
+        """Execute a shell command and return output"""
+        try:
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=30
+            )
+            return result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return -1, "", "Command timed out"
+        except Exception as e:
+            return -1, "", str(e)
 
 
 class WebServerSecurityChecker(SecurityChecker):

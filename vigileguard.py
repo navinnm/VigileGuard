@@ -1,4 +1,3 @@
-__version__ = "1.0.5"
 #!/usr/bin/env python3
 """
 VigileGuard - Linux Security Audit Tool (Phase 1)
@@ -28,28 +27,14 @@ try:
     import click
     from rich.console import Console
     from rich.table import Table
-    from rich.panel import Panel
+    from rich.panel import Panel  # Added missing Panel import
     from rich.progress import Progress, SpinnerColumn, TextColumn
 except ImportError:
     print("Error: Required dependencies not installed.")
     print("Install with: pip install click rich")
     sys.exit(1)
 
-# Phase 2 dependencies (optional)
-try:
-    from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
-    from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
-    from phase2_integration import ConfigurationManager, NotificationManager
-    PHASE2_ENABLED = True
-    print("✅ Phase 2 components loaded successfully")
-except ImportError as e:
-    PHASE2_ENABLED = False
-    print(f"⚠️ Phase 2 components not available: {e}")
-
-except ImportError:
-    print("Error: Required dependencies not installed.")
-    print("Install with: pip install click rich")
-    sys.exit(1)
+__version__ = "1.0.5"
 
 # Global console for rich output
 console = Console()
@@ -321,14 +306,14 @@ class UserAccountChecker(SecurityChecker):
             duplicates = {uid: users for uid, users in uid_map.items() if len(users) > 1}
             
             if duplicates:
-             self.add_finding(
-                category="User Accounts",
-                severity=SeverityLevel.HIGH,
-                title="Duplicate UIDs found",
-                description=f"Found {len(duplicates)} UIDs assigned to multiple users",
-                recommendation="Assign unique UIDs to each user account",
-                details={"duplicates": duplicates},  # ← Added comma here
-             )
+                self.add_finding(
+                    category="User Accounts",
+                    severity=SeverityLevel.HIGH,
+                    title="Duplicate UIDs found",
+                    description=f"Found {len(duplicates)} UIDs assigned to multiple users",
+                    recommendation="Assign unique UIDs to each user account",
+                    details={"duplicates": duplicates}
+                )
         except OSError:
             pass
 
@@ -613,24 +598,24 @@ class AuditEngine:
         ]
         self.all_findings: List[Finding] = []
         
-        # Phase 2 enhancements (properly indented)
-        if PHASE2_ENABLED:
-            self.config_manager = ConfigurationManager(config_file)
-            self.enhanced_config = self.config_manager.get_environment_config()
-            self.notification_manager = NotificationManager(self.enhanced_config)
-            
-            # Add Phase 2 checkers
+        # Try to add Phase 2 checkers if available
+        try:
+            # Import Phase 2 checkers at runtime to avoid circular imports
+            from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
             self.checkers.extend([
                 WebServerSecurityChecker(),
                 NetworkSecurityChecker()
             ])
+            console.print("✅ Phase 2 components loaded successfully", style="green")
+        except ImportError as e:
+            console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
 
     def _get_scan_info(self) -> Dict[str, Any]:
         """Get scan information dictionary"""
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '2.0.0' if PHASE2_ENABLED else '1.0.5',
+            'version': __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -683,15 +668,22 @@ class AuditEngine:
         return self.all_findings
     
     def generate_report(self, format_type: str = "console") -> str:
-        if format_type == "html" and PHASE2_ENABLED:
-            html_reporter = HTMLReporter(self.all_findings, self._get_scan_info())
-            return html_reporter.generate_report("report.html")
-        elif format_type == "compliance" and PHASE2_ENABLED:
-            compliance_mapper = ComplianceMapper()
-            return compliance_mapper.generate_compliance_report(self.all_findings)
+        """Generate report in specified format"""
+        if format_type == "console":
+            return self._generate_console_report()
+        elif format_type == "json":
+            return self._generate_json_report()
+        elif format_type == "html":
+            # Try to use Phase 2 HTML reporter if available
+            try:
+                from enhanced_reporting import HTMLReporter
+                html_reporter = HTMLReporter(self.all_findings, self._get_scan_info())
+                return html_reporter.generate_report("report.html")
+            except ImportError:
+                console.print("❌ HTML format requires Phase 2 components", style="red")
+                return ""
         else:
-            # Use existing Phase 1 methods
-            return self._generate_console_report() if format_type == "console" else self._generate_json_report()
+            return self._generate_console_report()
     
     def _generate_console_report(self) -> str:
         """Generate console-friendly report"""
@@ -746,13 +738,7 @@ class AuditEngine:
     def _generate_json_report(self) -> str:
         """Generate JSON report"""
         report = {
-            "scan_info": {
-                "timestamp": datetime.now().isoformat(),
-                "tool": "VigileGuard",
-                "version": "1.0.0",
-                "hostname": platform.node(),
-                "repository": "https://github.com/navinnm/VigileGuard"
-            },
+            "scan_info": self._get_scan_info(),
             "summary": {
                 "total_findings": len(self.all_findings),
                 "by_severity": {}
@@ -776,23 +762,22 @@ class AuditEngine:
 @click.option('--environment', '-e', help='Environment (development/staging/production)')
 @click.option('--notifications', is_flag=True, help='Enable notifications')
 @click.option('--debug', is_flag=True, help='Enable debug output')
-@click.version_option(version='2.0.0')
+@click.version_option(version=__version__)
 def main(config: Optional[str], output: Optional[str], output_format: str, 
          environment: Optional[str], notifications: bool, debug: bool):
     """
-        VigileGuard - Linux Security Audit Tool (Phase 1 + 2)
-        
-        Performs comprehensive security audits including:
-        - File permission analysis
-        - User account security checks  
-        - SSH configuration review
-        - System information gathering
-        - Web server security (Phase 2)
-        - Network security analysis (Phase 2)
-        - Enhanced reporting (Phase 2)
-        
-        Repository: https://github.com/navinnm/VigileGuard
-        """
+    VigileGuard - Linux Security Audit Tool
+    
+    Performs comprehensive security audits including:
+    - File permission analysis
+    - User account security checks  
+    - SSH configuration review
+    - System information gathering
+    - Web server security (if Phase 2 available)
+    - Network security analysis (if Phase 2 available)
+    
+    Repository: https://github.com/navinnm/VigileGuard
+    """
     try:
         # Check if Phase 2 components are available
         phase2_available = False
@@ -812,6 +797,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                 console.print("  - phase2_integration.py", style="yellow")
                 sys.exit(1)
             phase2_available = False
+            console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
         
         # Initialize appropriate engine based on available features
         if phase2_available:
@@ -829,7 +815,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '2.0.0' if phase2_available else '1.0.0',
+            'version': '2.0.0' if phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }

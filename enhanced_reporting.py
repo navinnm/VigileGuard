@@ -12,8 +12,33 @@ from pathlib import Path
 import tempfile
 import hashlib
 
-# Import from Phase 1
-from vigileguard import Finding, SeverityLevel
+# Re-define required classes to avoid circular imports
+from enum import Enum
+from dataclasses import dataclass, asdict
+
+class SeverityLevel(Enum):
+    """Security finding severity levels"""
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+@dataclass
+class Finding:
+    """Represents a security finding"""
+    category: str
+    severity: SeverityLevel
+    title: str
+    description: str
+    recommendation: str
+    details: Optional[Dict[str, Any]] = None  
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert finding to dictionary"""
+        result = asdict(self)
+        result["severity"] = self.severity.value
+        return result
 
 
 class HTMLReporter:
@@ -929,14 +954,6 @@ class TrendTracker:
         
         return severity_trends
     
-    def _generate_trend_recommendations(self, scans: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-        """Generate recommendations based on trends"""
-        recommendations = []
-        
-        if len(scans) < 2:
-            return recommendations
-        
-        # Check for increasing critical/high issues
     def _generate_trend_recommendations(self, scans: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """Generate recommendations based on trends"""
         recommendations = []
