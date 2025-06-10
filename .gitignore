@@ -1,0 +1,6 @@
+./vigileguard.egg-info/
+./dist/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+vigileguard.egg-info/
+dist/
