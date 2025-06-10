@@ -17,11 +17,8 @@ import subprocess
 import stat
 import pwd
 import grp
-import re
-import argparse
 import platform
 from datetime import datetime
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -32,7 +29,6 @@ try:
     from rich.table import Table
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.text import Text
 except ImportError:
     print("Error: Required dependencies not installed.")
     print("Install with: pip install click rich")
@@ -41,6 +37,7 @@ except ImportError:
 # Global console for rich output
 console = Console()
 
+
 class SeverityLevel(Enum):
     """Security finding severity levels"""
     CRITICAL = "CRITICAL"
@@ -48,6 +45,7 @@ class SeverityLevel(Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
     INFO = "INFO"
+
 
 @dataclass
 class Finding:
@@ -58,25 +56,26 @@ class Finding:
     description: str
     recommendation: str
     details: Dict[str, Any] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert finding to dictionary"""
         result = asdict(self)
-        result['severity'] = self.severity.value
+        result["severity"] = self.severity.value
         return result
+
 
 class SecurityChecker:
     """Base class for all security checkers"""
-    
+
     def __init__(self):
         self.findings: List[Finding] = []
-        
+
     def check(self) -> List[Finding]:
         """Run the security check - to be implemented by subclasses"""
         raise NotImplementedError
-        
-    def add_finding(self, category: str, severity: SeverityLevel, title: str, 
-                   description: str, recommendation: str, details: Dict = None):
+
+    def add_finding(self, category: str, severity: SeverityLevel, title: str,
+                    description: str, recommendation: str, details: Dict = None):
         """Add a security finding"""
         finding = Finding(
             category=category,
@@ -87,7 +86,7 @@ class SecurityChecker:
             details=details or {}
         )
         self.findings.append(finding)
-        
+
     def run_command(self, command: str) -> tuple:
         """Execute a shell command and return output"""
         try:
@@ -100,32 +99,33 @@ class SecurityChecker:
         except Exception as e:
             return -1, "", str(e)
 
+
 class FilePermissionChecker(SecurityChecker):
     """Check file and directory permissions for security issues"""
-    
+
     def check(self) -> List[Finding]:
         """Run file permission checks"""
         console.print("🔍 Checking file permissions...", style="yellow")
-        
+
         # Check world-writable files
         self._check_world_writable_files()
-        
+
         # Check SUID/SGID binaries
         self._check_suid_sgid_files()
-        
+
         # Check sensitive file permissions
         self._check_sensitive_files()
-        
+
         # Check home directory permissions
         self._check_home_directories()
-        
+
         return self.findings
-    
+
     def _check_world_writable_files(self):
         """Find world-writable files and directories"""
         cmd = "find /etc /usr /var -type f -perm -002 2>/dev/null | head -20"
         returncode, stdout, stderr = self.run_command(cmd)
-        
+
         if returncode == 0 and stdout.strip():
             files = [f for f in stdout.strip().split('\n') if f]
             if files:
@@ -133,38 +133,42 @@ class FilePermissionChecker(SecurityChecker):
                     category="File Permissions",
                     severity=SeverityLevel.HIGH,
                     title="World-writable files found",
-                    description=f"Found {len(files)} world-writable files in system directories",
+                    description=(f"Found {len(files)} world-writable files "
+                                f"in system directories"),
                     recommendation="Remove world-write permissions: chmod o-w <filename>",
                     details={"files": files[:10]}  # Limit to first 10
                 )
-    
+
     def _check_suid_sgid_files(self):
         """Find SUID and SGID binaries"""
-        cmd = "find /usr /bin /sbin -type f \\( -perm -4000 -o -perm -2000 \\) 2>/dev/null"
+        cmd = ("find /usr /bin /sbin -type f \\( -perm -4000 -o -perm -2000 \\) "
+               "2>/dev/null")
         returncode, stdout, stderr = self.run_command(cmd)
-        
+
         if returncode == 0 and stdout.strip():
             files = stdout.strip().split('\n')
-            
+
             # Known safe SUID/SGID files (common ones)
             safe_files = {
-                '/usr/bin/sudo', '/usr/bin/su', '/usr/bin/passwd', 
+                '/usr/bin/sudo', '/usr/bin/su', '/usr/bin/passwd',
                 '/usr/bin/chsh', '/usr/bin/chfn', '/usr/bin/newgrp',
                 '/usr/bin/gpasswd', '/bin/ping', '/bin/mount', '/bin/umount'
             }
-            
+
             suspicious_files = [f for f in files if f not in safe_files]
-            
+
             if suspicious_files:
                 self.add_finding(
                     category="File Permissions",
                     severity=SeverityLevel.MEDIUM,
                     title="Unusual SUID/SGID binaries found",
-                    description=f"Found {len(suspicious_files)} potentially unnecessary SUID/SGID files",
-                    recommendation="Review each file and remove SUID/SGID bits if not needed: chmod u-s <filename>",
+                    description=(f"Found {len(suspicious_files)} potentially "
+                                f"unnecessary SUID/SGID files"),
+                    recommendation=("Review each file and remove SUID/SGID bits if not "
+                                   "needed: chmod u-s <filename>"),
                     details={"files": suspicious_files}
                 )
-    
+
     def _check_sensitive_files(self):
         """Check permissions on sensitive system files"""
         sensitive_files = {
@@ -174,7 +178,7 @@ class FilePermissionChecker(SecurityChecker):
             '/etc/gshadow': (0o640, 'root', 'shadow'),
             '/etc/sudoers': (0o440, 'root', 'root'),
         }
-        
+
         for filepath, (expected_mode, expected_owner, expected_group) in sensitive_files.items():
             if os.path.exists(filepath):
                 try:
@@ -182,34 +186,41 @@ class FilePermissionChecker(SecurityChecker):
                     actual_mode = stat.S_IMODE(stat_info.st_mode)
                     actual_owner = pwd.getpwuid(stat_info.st_uid).pw_name
                     actual_group = grp.getgrgid(stat_info.st_gid).gr_name
-                    
+
                     issues = []
                     if actual_mode != expected_mode:
-                        issues.append(f"mode {oct(actual_mode)} (expected {oct(expected_mode)})")
+                        issues.append(f"mode {oct(actual_mode)} "
+                                     f"(expected {oct(expected_mode)})")
                     if actual_owner != expected_owner:
-                        issues.append(f"owner {actual_owner} (expected {expected_owner})")
+                        issues.append(f"owner {actual_owner} "
+                                     f"(expected {expected_owner})")
                     if actual_group != expected_group:
-                        issues.append(f"group {actual_group} (expected {expected_group})")
-                    
+                        issues.append(f"group {actual_group} "
+                                     f"(expected {expected_group})")
+
                     if issues:
                         self.add_finding(
                             category="File Permissions",
                             severity=SeverityLevel.HIGH,
                             title=f"Incorrect permissions on {filepath}",
-                            description=f"Security-sensitive file has incorrect {', '.join(issues)}",
-                            recommendation=f"Fix with: chown {expected_owner}:{expected_group} {filepath} && chmod {oct(expected_mode)} {filepath}",
+                            description=(f"Security-sensitive file has incorrect "
+                                        f"{', '.join(issues)}"),
+                            recommendation=(f"Fix with: chown {expected_owner}:"
+                                          f"{expected_group} {filepath} && "
+                                          f"chmod {oct(expected_mode)} {filepath}"),
                             details={"file": filepath, "issues": issues}
                         )
                 except (OSError, KeyError):
                     pass
-    
+
     def _check_home_directories(self):
         """Check home directory permissions"""
         cmd = "find /home -maxdepth 1 -type d -perm -002 2>/dev/null"
         returncode, stdout, stderr = self.run_command(cmd)
-        
+
         if returncode == 0 and stdout.strip():
-            dirs = [d for d in stdout.strip().split('\n') if d and d != '/home']
+            dirs = [d for d in stdout.strip().split('\n')
+                   if d and d != '/home']
             if dirs:
                 self.add_finding(
                     category="File Permissions",
