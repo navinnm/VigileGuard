@@ -441,7 +441,7 @@ jobs:
           ./install.sh
           echo "✅ Installation process test passed"
 
-  # VigileGuard Demo (Enhanced for Phase 2)
+  # VigileGuard Demo (Enhanced for Phase 2) - FIXED VERSION
   demo:
     name: VigileGuard Security Demo
     runs-on: ubuntu-latest
@@ -482,32 +482,41 @@ jobs:
           if [ -f demo-report.json ] && [ -s demo-report.json ]; then
             echo ""
             echo "📋 Security Audit Summary:"
-            python -c "
-          import json
-          try:
-              with open('demo-report.json', 'r') as f:
-                  data = json.load(f)
-                  total = data.get('summary', {}).get('total_findings', 0)
-                  by_severity = data.get('summary', {}).get('by_severity', {})
-                  
-                  print(f'🔍 Total findings: {total}')
-                  for severity, count in by_severity.items():
-                      if count > 0:
-                          emoji = '🔴' if severity in ['CRITICAL', 'HIGH'] else '🟡' if severity == 'MEDIUM' else '🔵'
-                          print(f'{emoji} {severity}: {count}')
-                  print('')
-                  print('✅ VigileGuard Phase 1 + 2 successfully identified security issues!')
-                  print('📖 This demonstrates both Phase 1 and Phase 2 features are working.')
-                  
-                  # Show categories found
-                  findings = data.get('findings', [])
-                  categories = set(f.get('category', 'Unknown') for f in findings)
-                  if categories:
-                      print(f'📂 Categories checked: {", ".join(sorted(categories))}')
-          except Exception as e:
-              print(f'Error reading report: {e}')
-              print('Demo completed but report analysis failed.')
-          "
+            # FIXED: Proper multiline Python string with escape characters
+            python -c '
+              import json
+              import sys
+
+              try:
+                  with open("demo-report.json", "r") as f:
+                      data = json.load(f)
+                      total = data.get("summary", {}).get("total_findings", 0)
+                      by_severity = data.get("summary", {}).get("by_severity", {})
+                      
+                      print(f"🔍 Total findings: {total}")
+                      for severity, count in by_severity.items():
+                          if count > 0:
+                              emoji = "🔴" if severity in ["CRITICAL", "HIGH"] else "🟡" if severity == "MEDIUM" else "🔵"
+                              print(f"{emoji} {severity}: {count}")
+                      print("")
+                      print("✅ VigileGuard Phase 1 + 2 successfully identified security issues!")
+                      print("📖 This demonstrates both Phase 1 and Phase 2 features are working.")
+                      
+                      # Show categories found
+                      findings = data.get("findings", [])
+                      categories = set(f.get("category", "Unknown") for f in findings)
+                      if categories:
+                          print(f"📂 Categories checked: {', '.join(sorted(categories))}")
+              except json.JSONDecodeError as e:
+                  print(f"⚠️ JSON file exists but contains invalid JSON: {e}")
+                  sys.exit(0)  # Non-critical error
+              except FileNotFoundError:
+                  print("⚠️ Demo report file not found")
+                  sys.exit(0)  # Non-critical error
+              except Exception as e:
+                  print(f"⚠️ JSON validation failed: {e}")
+                  sys.exit(0)  # Non-critical error
+              '
           else
             echo "⚠️ Demo report not generated, but this is non-critical for CI/CD"
           fi
@@ -515,42 +524,46 @@ jobs:
       - name: Generate demo badge
         run: |
           echo "🏷️ Generating demo badge..."
-          python -c "
-          import json
-          import os
-          
-          try:
-              if os.path.exists('demo-report.json') and os.path.getsize('demo-report.json') > 0:
-                  with open('demo-report.json', 'r') as f:
-                      data = json.load(f)
-                      total = data.get('summary', {}).get('total_findings', 0)
-                      by_severity = data.get('summary', {}).get('by_severity', {})
-                      critical_high = by_severity.get('CRITICAL', 0) + by_severity.get('HIGH', 0)
-              else:
-                  total = 0
-                  critical_high = 0
-                  
-              # Create a simple badge data
-              badge_data = {
-                  'schemaVersion': 1,
-                  'label': 'VigileGuard Demo',
-                  'message': f'{total} findings ({critical_high} critical/high)',
-                  'color': 'red' if critical_high > 0 else 'yellow' if total > 0 else 'green'
-              }
-              
-              with open('demo-badge.json', 'w') as badge_file:
-                  json.dump(badge_data, badge_file, indent=2)
-          except Exception as e:
-              # Fallback badge
-              badge_data = {
-                  'schemaVersion': 1,
-                  'label': 'VigileGuard Demo',
-                  'message': 'completed',
-                  'color': 'blue'
-              }
-              with open('demo-badge.json', 'w') as badge_file:
-                  json.dump(badge_data, badge_file, indent=2)
-          "
+          # FIXED: Proper multiline Python string handling
+          python -c '
+            import json
+            import os
+
+            try:
+                if os.path.exists("demo-report.json") and os.path.getsize("demo-report.json") > 0:
+                    with open("demo-report.json", "r") as f:
+                        data = json.load(f)
+                        total = data.get("summary", {}).get("total_findings", 0)
+                        by_severity = data.get("summary", {}).get("by_severity", {})
+                        critical_high = by_severity.get("CRITICAL", 0) + by_severity.get("HIGH", 0)
+                else:
+                    total = 0
+                    critical_high = 0
+                    
+                # Create a simple badge data
+                badge_data = {
+                    "schemaVersion": 1,
+                    "label": "VigileGuard Demo",
+                    "message": f"{total} findings ({critical_high} critical/high)",
+                    "color": "red" if critical_high > 0 else "yellow" if total > 0 else "green"
+                }
+                
+                with open("demo-badge.json", "w") as badge_file:
+                    json.dump(badge_data, badge_file, indent=2)
+                    
+                print("✅ Demo badge generated successfully")
+            except Exception as e:
+                # Fallback badge
+                badge_data = {
+                    "schemaVersion": 1,
+                    "label": "VigileGuard Demo",
+                    "message": "completed",
+                    "color": "blue"
+                }
+                with open("demo-badge.json", "w") as badge_file:
+                    json.dump(badge_data, badge_file, indent=2)
+                print(f"⚠️ Demo badge generation had issues: {e}, created fallback badge")
+            '
 
       - name: Upload demo results
         uses: actions/upload-artifact@v4
