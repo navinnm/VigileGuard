@@ -292,17 +292,17 @@ class UserAccountChecker(SecurityChecker):
             duplicates = {uid: users for uid, users in uid_map.items() if len(users) > 1}
             
             if duplicates:
-                self.add_finding(
-                    category="User Accounts",
-                    severity=SeverityLevel.HIGH,
-                    title="Duplicate UIDs found",
-                    description=f"Found {len(duplicates)} UIDs assigned to multiple users",
-                    recommendation="Assign unique UIDs to each user account",
-                    details={"duplicates": duplicates}
-                )
+             self.add_finding(
+                category="User Accounts",
+                severity=SeverityLevel.HIGH,
+                title="Duplicate UIDs found",
+                description=f"Found {len(duplicates)} UIDs assigned to multiple users",
+                recommendation="Assign unique UIDs to each user account",
+                details={"duplicates": duplicates},  # ← Added comma here
+             )
         except OSError:
             pass
-    
+
     def _check_sudo_config(self):
         """Check sudo configuration"""
         if os.path.exists('/etc/sudoers'):
