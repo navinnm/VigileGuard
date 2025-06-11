@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vigileguard"
-version = "2.0.1"
+version = "2.0.2"
 description = "Comprehensive Linux Security Audit Tool with Phase 1 & 2 Features"
 readme = "README.md"
 license = {text = "MIT"}

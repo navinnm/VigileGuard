@@ -43,7 +43,7 @@ help:
 PYTHON := python3
 PIP := pip3
 PACKAGE_NAME := vigileguard
-VERSION := $(shell $(PYTHON) -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "2.0.1")
+VERSION := $(shell $(PYTHON) -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "2.0.2")
 
 # Setup & Installation
 install:
