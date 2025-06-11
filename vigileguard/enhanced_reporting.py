@@ -307,7 +307,7 @@ class HTMLReporter:
         }
         
         .header {
-            background: linear-gradient(135deg, #d9dffb 0%, #4d4357 100%)
+            background: linear-gradient(135deg, #d9dffb 0%, #4d4357 100%);
             color: white;
             padding: 30px;
             border-radius: 10px;
