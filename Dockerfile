@@ -49,7 +49,6 @@ WORKDIR /app
 # Copy package files
 COPY requirements.txt .
 COPY pyproject.toml .
-COPY setup.py .
 COPY README.md .
 
 # Install Python dependencies + development tools
