@@ -1,9 +1,52 @@
+# MANIFEST.in - Include additional files in source distribution
+
+# Include documentation
 include README.md
 include LICENSE
-include requirements.txt
+include SECURITY.md
+include CHANGELOG.md
+
+# Include configuration files
 include config.yaml
-include install.sh
-include Makefile
+include pyproject.toml
+include requirements.txt
+
+# Include scripts (make them optional)
+graft scripts
+global-exclude scripts/vigileguard-setup-cron.sh
+
+# Include examples and documentation
+graft examples
 recursive-include docs *
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
+
+# Include test files
+graft tests
+
+# Include package data
+recursive-include vigileguard *.py
+recursive-include vigileguard *.yaml
+recursive-include vigileguard *.yml
+recursive-include vigileguard *.json
+
+# Exclude development and build files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude *.so
+global-exclude .git*
+global-exclude .DS_Store
+global-exclude *.egg-info
+prune build
+prune dist
+prune .git
+prune .github
+prune .venv
+prune venv
+prune .pytest_cache
+prune .mypy_cache
+prune .tox
+
+# Exclude reports and temporary files
+global-exclude *.log
+global-exclude *.tmp
+prune reports
+prune logs
