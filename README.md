@@ -243,7 +243,7 @@ LOW: 2
   "scan_info": {
     "timestamp": "2025-06-11T20:39:00Z",
     "hostname": "web-server-01",
-    "version": "1.0.6"
+    "version": "2.0.1"
   },
   "summary": {
     "total_findings": 10,

@@ -23,7 +23,7 @@ Repository: https://github.com/navinnm/VigileGuard
 License: MIT
 """
 
-__version__ = "1.0.6"
+__version__ = "2.0.1"
 __author__ = "VigileGuard Development Team"
 __license__ = "MIT"
 __repository__ = "https://github.com/navinnm/VigileGuard"
