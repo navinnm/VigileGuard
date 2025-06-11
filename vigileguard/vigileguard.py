@@ -18,12 +18,10 @@ import stat
 import pwd
 import grp
 import platform
-import datetime
-from datetime import datetime as dt
-from typing import List, Dict, Any, Optional, Set
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
-from pathlib import Path
 
 # Add current directory to Python path to help with imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -81,27 +79,7 @@ class Finding:
         result = asdict(self)
         result["severity"] = self.severity.value
         return result
-class AccountRiskProfile:
-    """Comprehensive account risk assessment"""
-    username: str
-    uid: int
-    gid: int
-    shell: str
-    home_dir: str
-    last_login: Optional[datetime.datetime]  # This will now work
-    password_age: int
-    failed_logins: int
-    privilege_level: str
-    account_type: str
-    compliance_issues: List[str]
-    risk_score: int
 
-class PrivilegeLevel(Enum):
-    SYSTEM = "system"
-    ADMIN = "admin"
-    SERVICE = "service"
-    USER = "user"
-    GUEST = "guest"
 
 
 class SecurityChecker:
@@ -877,871 +855,142 @@ class FilePermissionChecker(SecurityChecker):
             )
             
 class UserAccountChecker(SecurityChecker):
-    """Enterprise-level user account and authentication security checker"""
+    """Check user accounts and authentication settings"""
     
-    def __init__(self):
-        super().__init__()
-        self.password_dictionary = self._load_common_passwords()
-        self.compliance_standards = {
-            'CIS': self._get_cis_requirements(),
-            'NIST': self._get_nist_requirements(),
-            'PCI_DSS': self._get_pci_requirements(),
-            'SOX': self._get_sox_requirements()
-        }
-        
     def check(self) -> List[Finding]:
-        """Comprehensive enterprise user account security assessment"""
+        """Run user account security checks"""
         if RICH_AVAILABLE:
-            console.print("🔐 Running Enterprise User Account Security Assessment...", style="bold blue")
+            console.print("👥 Checking user accounts...", style="yellow")
+        else:
+            print("👥 Checking user accounts...")
         
-        # Core security checks
-        self._analyze_account_inventory()
-        self._assess_authentication_mechanisms()
-        self._audit_privilege_escalation()
-        self._check_account_lockout_policies()
-        self._analyze_password_security()
-        self._audit_session_management()
-        self._check_multi_factor_authentication()
-        self._assess_account_lifecycle_management()
-        self._audit_privileged_access_management()
-        self._check_compliance_requirements()
-        self._analyze_authentication_logs()
-        self._assess_identity_correlation()
+        # Check for accounts with empty passwords
+        self._check_empty_passwords()
+        
+        # Check for duplicate UIDs
+        self._check_duplicate_uids()
+        
+        # Check sudo configuration
+        self._check_sudo_config()
+        
+        # Check password policies
+        self._check_password_policies()
         
         return self.findings
-
-    # Add these missing methods to the UserAccountChecker class
-
-    def _get_nist_requirements(self) -> Dict:
-        """NIST requirements for user accounts"""
-        return {
-            'password_policy': {
-                'min_length': 8,
-                'complexity': True,
-                'history': 24,
-                'max_age': 60
-            },
-            'account_lockout': {
-                'enabled': True,
-                'threshold': 3,
-                'duration': 1800
-            }
-        }
-
-    def _get_pci_requirements(self) -> Dict:
-        """PCI DSS requirements for user accounts"""
-        return {
-            'password_policy': {
-                'min_length': 7,
-                'complexity': True,
-                'history': 4,
-                'max_age': 90
-            },
-            'mfa_required': True
-        }
-
-    def _get_sox_requirements(self) -> Dict:
-        """SOX requirements for user accounts"""
-        return {
-            'access_reviews': True,
-            'segregation_of_duties': True,
-            'audit_logging': True
-        }
-
-    def _classify_account_type(self, user) -> str:
-        """Classify account type"""
-        if user.pw_uid < 1000:
-            return "system"
-        elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
-            return "service"
-        else:
-            return "user"
-
-    def _assess_privilege_level(self, user) -> 'PrivilegeLevel':
-        """Assess privilege level of user"""
-        if user.pw_uid == 0:
-            return PrivilegeLevel.ADMIN
-        elif user.pw_uid < 1000:
-            return PrivilegeLevel.SYSTEM
-        elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
-            return PrivilegeLevel.SERVICE
-        else:
-            return PrivilegeLevel.USER
-
-    def _calculate_password_age(self, shadow_entry) -> int:
-        """Calculate password age in days"""
-        try:
-            if shadow_entry.sp_lstchg and shadow_entry.sp_lstchg > 0:
-                last_change = dt.fromtimestamp(shadow_entry.sp_lstchg * 86400)
-                return (dt.now() - last_change).days
-        except (ValueError, TypeError):
-            pass
-        return -1
-
-    def _get_last_login(self, username: str) -> Optional[datetime.datetime]:
-        """Get last login time for user"""
-        try:
-            cmd = f"lastlog -u {username} 2>/dev/null | tail -1"
-            returncode, stdout, stderr = self.run_command(cmd)
-            if returncode == 0 and "Never logged in" not in stdout:
-                # This is a simplified parser - real implementation would be more robust
-                return dt.now()  # Placeholder
-        except Exception:
-            pass
-        return None
-
-    def _get_failed_login_count(self, username: str) -> int:
-        """Get failed login count for user"""
-        try:
-            cmd = f"faillog -u {username} 2>/dev/null | grep -v 'Failures' | wc -l"
-            returncode, stdout, stderr = self.run_command(cmd)
-            if returncode == 0:
-                return int(stdout.strip()) if stdout.strip().isdigit() else 0
-        except Exception:
-            pass
-        return 0
-
-    def _analyze_account_distribution(self, accounts: List['AccountRiskProfile']):
-        """Analyze account distribution"""
-        # Placeholder - implement account distribution analysis
-        pass
-
-    def _identify_dormant_accounts(self, accounts: List['AccountRiskProfile']):
-        """Identify dormant accounts"""
-        dormant_accounts = []
-        for account in accounts:
-            if not account.last_login or (dt.now() - account.last_login).days > 90:
-                dormant_accounts.append(account.username)
-        
-        if dormant_accounts:
-            self.add_finding(
-                category="Account Management",
-                severity=SeverityLevel.MEDIUM,
-                title="Dormant Accounts Detected",
-                description=f"Found {len(dormant_accounts)} accounts that haven't been used in 90+ days",
-                recommendation="Review and disable/remove dormant accounts",
-                details={"dormant_accounts": dormant_accounts}
-            )
-
-    def _analyze_privileged_accounts(self, accounts: List['AccountRiskProfile']):
-        """Analyze privileged accounts"""
-        privileged_accounts = [acc for acc in accounts if acc.privilege_level in ['admin', 'system']]
-        if len(privileged_accounts) > 5:  # Arbitrary threshold
-            self.add_finding(
-                category="Privilege Management",
-                severity=SeverityLevel.MEDIUM,
-                title="High Number of Privileged Accounts",
-                description=f"Found {len(privileged_accounts)} privileged accounts",
-                recommendation="Review privileged account necessity and implement least privilege",
-                details={"privileged_count": len(privileged_accounts)}
-            )
-
-    def _analyze_pam_configuration(self):
-        """Analyze PAM configuration"""
-        # Placeholder implementation
-        pass
-
-    def _verify_authentication_logging(self):
-        """Verify authentication logging is enabled"""
-        # Placeholder implementation
-        pass
-
-    def _audit_suid_sgid_binaries(self):
-        """Audit SUID/SGID binaries"""
-        # Placeholder implementation
-        pass
-
-    def _audit_dangerous_group_memberships(self):
-        """Audit dangerous group memberships"""
-        # Placeholder implementation
-        pass
-
-    def _identify_escalation_vectors(self) -> List[str]:
-        """Identify privilege escalation vectors"""
-        # Placeholder implementation
-        return []
-
-    def _analyze_lockout_configuration(self) -> Dict:
-        """Analyze account lockout configuration"""
-        return {"enabled": False}
-
-   
-
-        def _get_locked_accounts(self) -> List[str]:
-            """Get list of locked accounts"""
-            return []
-
-        def _assess_password_policy_compliance(self) -> Dict:
-            """Assess password policy compliance"""
-            return {"compliant": False, "gaps": ["No policy configured"]}
-
-        def _analyze_password_reuse(self):
-            """Analyze password reuse"""
-            # Placeholder implementation
-            pass
-
-        def _check_default_passwords(self):
-            """Check for default passwords"""
-            # Placeholder implementation
-            pass
-
-        def _is_password_weak(self, shadow_entry) -> bool:
-            """Check if password is weak"""
-            # Placeholder implementation - would need proper password analysis
-            return False
-
-        def _analyze_session_timeouts(self) -> Dict:
-            """Analyze session timeout configuration"""
-            return {"configured": False}
-
-        def _check_concurrent_session_limits(self):
-            """Check concurrent session limits"""
-            # Placeholder implementation
-            pass
-
-        def _verify_session_logging(self):
-            """Verify session logging"""
-            # Placeholder implementation
-            pass
-
-        def _assess_mfa_implementation(self) -> Dict:
-            """Assess MFA implementation"""
-            return {"enabled": self._check_mfa_configured(), "available_methods": []}
-
-        def _identify_mfa_bypasses(self) -> List[str]:
-            """Identify MFA bypass mechanisms"""
-            return []
-
-        def _identify_orphaned_accounts(self) -> List[str]:
-            """Identify orphaned accounts"""
-            return []
-
-        def _detect_account_creation_anomalies(self):
-            """Detect account creation anomalies"""
-            # Placeholder implementation
-            pass
-
-        def _audit_service_accounts(self):
-            """Audit service accounts"""
-            # Placeholder implementation
-            pass
-
-        def _inventory_privileged_accounts(self) -> List[str]:
-            """Inventory privileged accounts"""
-            return []
-
-        def _assess_pam_compliance(self, privileged_accounts):
-            """Assess PAM compliance"""
-            # Placeholder implementation
-            pass
-
-        def _check_privileged_session_monitoring(self) -> Dict:
-            """Check privileged session monitoring"""
-            return {"enabled": False}
-
-        def _audit_emergency_access_procedures(self):
-            """Audit emergency access procedures"""
-            # Placeholder implementation
-            pass
-
-        def _assess_compliance(self, standard: str, requirements: Dict) -> Dict:
-            """Assess compliance with standard"""
-            return {"compliance_percentage": 50.0, "failed_controls": []}
-
-        def _analyze_login_patterns(self):
-            """Analyze login patterns"""
-            # Placeholder implementation
-            pass
-
-        def _detect_authentication_anomalies(self) -> List[str]:
-            """Detect authentication anomalies"""
-            return []
-
-        def _identify_suspicious_auth_activities(self):
-            """Identify suspicious authentication activities"""
-            # Placeholder implementation
-            pass
-
-        def _assess_identity_correlation(self):
-            """Assess identity correlation"""
-            # Placeholder implementation
-            pass
-
-        def _check_ssh_keys_configured(self) -> bool:
-            """Check if SSH keys are configured"""
-            return os.path.exists('/etc/ssh/ssh_host_rsa_key.pub')
-
-        def _get_configured_pam_modules(self) -> List[str]:
-            """Get configured PAM modules"""
-            modules = []
-            pam_files = ['/etc/pam.d/common-auth', '/etc/pam.d/sshd']
-            for pam_file in pam_files:
-                if os.path.exists(pam_file):
-                    try:
-                        with open(pam_file, 'r') as f:
-                            content = f.read()
-                            if 'pam_unix' in content:
-                                modules.append('pam_unix')
-                            if 'pam_ldap' in content:
-                                modules.append('pam_ldap')
-                    except Exception:
-                        pass
-            return modules
-
-        def _check_anonymous_access(self) -> bool:
-            """Check for anonymous access"""
-            # Check for guest account or anonymous FTP
-            try:
-                pwd.getpwnam('guest')
-                return True
-            except KeyError:
-                pass
-            return False
     
-    def _analyze_account_inventory(self):
-        """Comprehensive account inventory and risk profiling"""
+    def _check_empty_passwords(self):
+        """Check for accounts with empty passwords"""
         try:
-            accounts = []
-            risk_profiles = []
+            with open('/etc/shadow', 'r') as f:
+                lines = f.readlines()
             
-            for user in pwd.getpwall():
-                profile = self._build_account_risk_profile(user)
-                accounts.append(profile)
-                risk_profiles.append(profile)
+            empty_password_accounts = []
+            for line in lines:
+                if line.strip():
+                    parts = line.split(':')
+                    if len(parts) >= 2 and parts[1] == '':
+                        empty_password_accounts.append(parts[0])
             
-            # Analyze account distribution
-            self._analyze_account_distribution(accounts)
-            
-            # Identify high-risk accounts
-            high_risk_accounts = [acc for acc in risk_profiles if acc.risk_score >= 80]
-            if high_risk_accounts:
+            if empty_password_accounts:
                 self.add_finding(
-                    category="Account Management",
+                    category="User Accounts",
                     severity=SeverityLevel.CRITICAL,
-                    title="High-Risk User Accounts Detected",
-                    description=f"Identified {len(high_risk_accounts)} accounts with elevated security risks",
-                    recommendation="Implement immediate remediation for high-risk accounts",
-                    details={
-                        "high_risk_accounts": [
-                            {
-                                "username": acc.username,
-                                "risk_score": acc.risk_score,
-                                "issues": acc.compliance_issues,
-                                "privilege_level": acc.privilege_level
-                            } for acc in high_risk_accounts
-                        ]
-                    }
+                    title="Accounts with empty passwords found",
+                    description=f"Found {len(empty_password_accounts)} accounts with empty passwords",
+                    recommendation="Set passwords for all accounts or disable them: passwd <username> or usermod -L <username>",
+                    details={"accounts": empty_password_accounts}
                 )
-            
-            # Check for dormant accounts
-            self._identify_dormant_accounts(accounts)
-            
-            # Analyze privileged account distribution
-            self._analyze_privileged_accounts(accounts)
-            
-        except Exception as e:
+        except (OSError, PermissionError):
             self.add_finding(
-                category="Account Management",
-                severity=SeverityLevel.HIGH,
-                title="Account Inventory Analysis Failed",
-                description=f"Unable to complete account inventory: {str(e)}",
-                recommendation="Investigate system access permissions and retry analysis"
+                category="User Accounts",
+                severity=SeverityLevel.INFO,
+                title="Cannot read /etc/shadow",
+                description="Insufficient permissions to check for empty passwords",
+                recommendation="Run VigileGuard with appropriate privileges"
             )
     
-    def _build_account_risk_profile(self, user) -> AccountRiskProfile:
-        """Build comprehensive risk profile for user account"""
-        risk_score = 0
-        compliance_issues = []
-        
-        # Determine account type and privilege level
-        account_type = self._classify_account_type(user)
-        privilege_level = self._assess_privilege_level(user)
-        
-        # Get password information
+    def _check_duplicate_uids(self):
+        """Check for duplicate UIDs"""
+        uid_map = {}
         try:
-            shadow_entry = spwd.getspnam(user.pw_name)
-            password_age = self._calculate_password_age(shadow_entry)
-        except (KeyError, PermissionError):
-            password_age = -1
-            risk_score += 10
-            compliance_issues.append("Cannot access password aging information")
-        
-        # Get last login information
-        last_login = self._get_last_login(user.pw_name)
-        
-        # Calculate failed login attempts
-        failed_logins = self._get_failed_login_count(user.pw_name)
-        
-        # Risk scoring
-        if user.pw_uid == 0:
-            risk_score += 30  # Root account
-        if not user.pw_shell or user.pw_shell in ['/bin/bash', '/bin/sh']:
-            risk_score += 15  # Interactive shell
-        if password_age > 90:
-            risk_score += 20  # Old password
-        if failed_logins > 5:
-            risk_score += 25  # Multiple failed logins
-        if not last_login or (dt.now() - last_login).days > 90:
-            risk_score += 15  # Dormant account
-        
-        return AccountRiskProfile(
-            username=user.pw_name,
-            uid=user.pw_uid,
-            gid=user.pw_gid,
-            shell=user.pw_shell,
-            home_dir=user.pw_dir,
-            last_login=last_login,
-            password_age=password_age,
-            failed_logins=failed_logins,
-            privilege_level=privilege_level.value,
-            account_type=account_type,
-            compliance_issues=compliance_issues,
-            risk_score=min(risk_score, 100)
-        )
-    
-    def _assess_authentication_mechanisms(self):
-        """Analyze authentication mechanisms and security"""
-        auth_methods = self._inventory_auth_methods()
-        
-        # Check for weak authentication methods
-        weak_methods = []
-        if 'password' in auth_methods and not auth_methods.get('mfa_enabled', False):
-            weak_methods.append("Password-only authentication without MFA")
-        
-        if auth_methods.get('anonymous_access', False):
-            weak_methods.append("Anonymous access enabled")
-        
-        if weak_methods:
-            self.add_finding(
-                category="Authentication",
-                severity=SeverityLevel.HIGH,
-                title="Weak Authentication Methods Detected",
-                description=f"System uses {len(weak_methods)} weak authentication methods",
-                recommendation="Implement multi-factor authentication and disable weak methods",
-                details={"weak_methods": weak_methods, "current_methods": auth_methods}
-            )
-        
-        # Analyze PAM configuration
-        self._analyze_pam_configuration()
-        
-        # Check authentication logging
-        self._verify_authentication_logging()
-    
-    def _audit_privilege_escalation(self):
-        """Comprehensive privilege escalation audit"""
-        
-        # Analyze sudo configuration with detailed rules
-        sudo_risks = self._analyze_sudo_configuration()
-        
-        # Check for SUID/SGID binaries
-        suid_findings = self._audit_suid_sgid_binaries()
-        
-        # Analyze group memberships
-        dangerous_groups = self._audit_dangerous_group_memberships()
-        
-        # Check for privilege escalation vectors
-        escalation_vectors = self._identify_escalation_vectors()
-        
-        if escalation_vectors:
-            self.add_finding(
-                category="Privilege Escalation",
-                severity=SeverityLevel.CRITICAL,
-                title="Privilege Escalation Vectors Identified",
-                description=f"Found {len(escalation_vectors)} potential privilege escalation paths",
-                recommendation="Implement least privilege principle and remove unnecessary permissions",
-                details={"escalation_vectors": escalation_vectors}
-            )
-    
-    def _analyze_sudo_configuration(self) -> List[Dict]:
-        """Detailed sudo configuration analysis"""
-        risks = []
-        
-        try:
-            # Parse sudoers file and includes
-            sudo_rules = self._parse_sudoers_files()
+            with open('/etc/passwd', 'r') as f:
+                for line in f:
+                    if line.strip() and not line.startswith('#'):
+                        parts = line.split(':')
+                        if len(parts) >= 3:
+                            username = parts[0]
+                            uid = parts[2]
+                            
+                            if uid in uid_map:
+                                uid_map[uid].append(username)
+                            else:
+                                uid_map[uid] = [username]
             
-            for rule in sudo_rules:
-                risk_level = self._assess_sudo_rule_risk(rule)
-                if risk_level >= 3:  # High risk threshold
-                    risks.append({
-                        'rule': rule,
-                        'risk_level': risk_level,
-                        'file': rule.get('source_file', 'unknown')
-                    })
+            duplicates = {uid: users for uid, users in uid_map.items() if len(users) > 1}
             
-            if risks:
+            if duplicates:
                 self.add_finding(
-                    category="Privilege Management",
+                    category="User Accounts",
                     severity=SeverityLevel.HIGH,
-                    title="High-Risk Sudo Configuration",
-                    description=f"Identified {len(risks)} high-risk sudo rules",
-                    recommendation="Review and restrict sudo permissions following least privilege principle",
-                    details={"risky_rules": risks}
+                    title="Duplicate UIDs found",
+                    description=f"Found {len(duplicates)} UIDs assigned to multiple users",
+                    recommendation="Assign unique UIDs to each user account",
+                    details={"duplicates": duplicates}
                 )
-        
-        except Exception as e:
-            self.add_finding(
-                category="Privilege Management",
-                severity=SeverityLevel.MEDIUM,
-                title="Sudo Configuration Analysis Failed",
-                description=f"Unable to analyze sudo configuration: {str(e)}",
-                recommendation="Manually review sudo configuration files"
-            )
-        
-        return risks
-    
-    def _check_account_lockout_policies(self):
-        """Analyze account lockout and brute force protection"""
-        
-        # Check PAM faillock/tally2 configuration
-        lockout_config = self._analyze_lockout_configuration()
-        
-        if not lockout_config.get('enabled', False):
-            self.add_finding(
-                category="Account Security",
-                severity=SeverityLevel.HIGH,
-                title="Account Lockout Policy Not Configured",
-                description="No account lockout mechanism found to prevent brute force attacks",
-                recommendation="Configure pam_faillock or pam_tally2 for account lockout protection",
-                details={"current_config": lockout_config}
-            )
-        
-        # Analyze current locked accounts
-        locked_accounts = self._get_locked_accounts()
-        if locked_accounts:
-            self.add_finding(
-                category="Account Security",
-                severity=SeverityLevel.MEDIUM,
-                title="Locked Accounts Detected",
-                description=f"Found {len(locked_accounts)} locked user accounts",
-                recommendation="Review locked accounts and implement unlock procedures",
-                details={"locked_accounts": locked_accounts}
-            )
-    
-    def _analyze_password_security(self):
-        """Enterprise password security analysis"""
-        
-        # Comprehensive password policy check
-        policy_compliance = self._assess_password_policy_compliance()
-        
-        # Password strength analysis
-        weak_passwords = self._identify_weak_passwords()
-        
-        # Password reuse analysis
-        password_reuse = self._analyze_password_reuse()
-        
-        # Default password check
-        default_passwords = self._check_default_passwords()
-        
-        if weak_passwords:
-            self.add_finding(
-                category="Password Security",
-                severity=SeverityLevel.CRITICAL,
-                title="Weak Passwords Detected",
-                description=f"Identified {len(weak_passwords)} accounts with weak passwords",
-                recommendation="Enforce strong password policy and require password changes",
-                details={"weak_password_accounts": weak_passwords}
-            )
-        
-        if not policy_compliance.get('compliant', False):
-            self.add_finding(
-                category="Password Security",
-                severity=SeverityLevel.HIGH,
-                title="Password Policy Non-Compliance",
-                description="Current password policy does not meet security standards",
-                recommendation="Update password policy to meet enterprise security requirements",
-                details={"policy_gaps": policy_compliance.get('gaps', [])}
-            )
-    
-    def _audit_session_management(self):
-        """Audit session management and timeout policies"""
-        
-        # Check session timeout configuration
-        timeout_config = self._analyze_session_timeouts()
-        
-        # Analyze concurrent session limits
-        session_limits = self._check_concurrent_session_limits()
-        
-        # Check session logging
-        session_logging = self._verify_session_logging()
-        
-        if not timeout_config.get('configured', False):
-            self.add_finding(
-                category="Session Management",
-                severity=SeverityLevel.MEDIUM,
-                title="Session Timeout Not Configured",
-                description="No automatic session timeout configured",
-                recommendation="Configure TMOUT and pam_limits for session management",
-                details={"current_config": timeout_config}
-            )
-    
-    def _check_multi_factor_authentication(self):
-        """Comprehensive MFA implementation analysis"""
-        
-        mfa_status = self._assess_mfa_implementation()
-        
-        if not mfa_status.get('enabled', False):
-            self.add_finding(
-                category="Authentication",
-                severity=SeverityLevel.HIGH,
-                title="Multi-Factor Authentication Not Implemented",
-                description="MFA is not configured for user authentication",
-                recommendation="Implement MFA using PAM modules (Google Authenticator, YubiKey, etc.)",
-                details={"available_methods": mfa_status.get('available_methods', [])}
-            )
-        
-        # Check MFA bypass mechanisms
-        mfa_bypasses = self._identify_mfa_bypasses()
-        if mfa_bypasses:
-            self.add_finding(
-                category="Authentication",
-                severity=SeverityLevel.HIGH,
-                title="MFA Bypass Mechanisms Detected",
-                description=f"Found {len(mfa_bypasses)} ways to bypass MFA",
-                recommendation="Remove MFA bypass mechanisms and enforce consistent MFA policy",
-                details={"bypass_methods": mfa_bypasses}
-            )
-    
-    def _assess_account_lifecycle_management(self):
-        """Analyze account provisioning and deprovisioning processes"""
-        
-        # Check for orphaned accounts
-        orphaned_accounts = self._identify_orphaned_accounts()
-        
-        # Analyze account creation patterns
-        creation_anomalies = self._detect_account_creation_anomalies()
-        
-        # Check service account management
-        service_account_issues = self._audit_service_accounts()
-        
-        if orphaned_accounts:
-            self.add_finding(
-                category="Account Lifecycle",
-                severity=SeverityLevel.MEDIUM,
-                title="Orphaned Accounts Detected",
-                description=f"Found {len(orphaned_accounts)} accounts without valid business purpose",
-                recommendation="Review and disable/remove orphaned accounts",
-                details={"orphaned_accounts": orphaned_accounts}
-            )
-    
-    def _audit_privileged_access_management(self):
-        """Comprehensive privileged access management audit"""
-        
-        # Identify all privileged accounts
-        privileged_accounts = self._inventory_privileged_accounts()
-        
-        # Check privileged account policies
-        pam_compliance = self._assess_pam_compliance(privileged_accounts)
-        
-        # Analyze privileged session monitoring
-        session_monitoring = self._check_privileged_session_monitoring()
-        
-        # Check emergency access procedures
-        emergency_access = self._audit_emergency_access_procedures()
-        
-        if not session_monitoring.get('enabled', False):
-            self.add_finding(
-                category="Privileged Access",
-                severity=SeverityLevel.HIGH,
-                title="Privileged Session Monitoring Not Implemented",
-                description="Privileged user activities are not being monitored",
-                recommendation="Implement privileged session monitoring and recording",
-                details={"privileged_accounts": len(privileged_accounts)}
-            )
-    
-    def _check_compliance_requirements(self):
-        """Check compliance with security standards"""
-        
-        for standard, requirements in self.compliance_standards.items():
-            compliance_status = self._assess_compliance(standard, requirements)
-            
-            if compliance_status['compliance_percentage'] < 80:
-                self.add_finding(
-                    category="Compliance",
-                    severity=SeverityLevel.HIGH,
-                    title=f"{standard} Compliance Gap",
-                    description=f"Only {compliance_status['compliance_percentage']:.1f}% compliant with {standard}",
-                    recommendation=f"Address {standard} compliance gaps",
-                    details={
-                        "failed_controls": compliance_status['failed_controls'],
-                        "compliance_percentage": compliance_status['compliance_percentage']
-                    }
-                )
-    
-    def _analyze_authentication_logs(self):
-        """Advanced authentication log analysis"""
-        
-        # Analyze login patterns
-        login_patterns = self._analyze_login_patterns()
-        
-        # Detect authentication anomalies
-        auth_anomalies = self._detect_authentication_anomalies()
-        
-        # Check for suspicious activities
-        suspicious_activities = self._identify_suspicious_auth_activities()
-        
-        if auth_anomalies:
-            self.add_finding(
-                category="Authentication Monitoring",
-                severity=SeverityLevel.MEDIUM,
-                title="Authentication Anomalies Detected",
-                description=f"Identified {len(auth_anomalies)} authentication anomalies",
-                recommendation="Investigate authentication anomalies and implement additional monitoring",
-                details={"anomalies": auth_anomalies}
-            )
-    
-    # Helper methods for enterprise features
-    
-    def _load_common_passwords(self) -> Set[str]:
-        """Load common password dictionary for weak password detection"""
-        common_passwords = {
-            'password', '123456', 'password123', 'admin', 'root', 'user',
-            'guest', 'test', 'demo', 'changeme', 'default', 'welcome'
-        }
-        
-        # Try to load from common password files
-        password_files = [
-            '/usr/share/dict/passwords',
-            '/usr/share/wordlists/rockyou.txt',
-            '/usr/share/john/password.lst'
-        ]
-        
-        for file_path in password_files:
-            if Path(file_path).exists():
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line in f:
-                            if len(line.strip()) > 0:
-                                common_passwords.add(line.strip().lower())
-                            if len(common_passwords) > 10000:  # Limit memory usage
-                                break
-                    break
-                except Exception:
-                    continue
-        
-        return common_passwords
-    
-    def _get_cis_requirements(self) -> Dict:
-        """CIS Controls requirements for user accounts"""
-        return {
-            'password_policy': {
-                'min_length': 14,
-                'complexity': True,
-                'history': 12,
-                'max_age': 90
-            },
-            'account_lockout': {
-                'enabled': True,
-                'threshold': 5,
-                'duration': 900
-            },
-            'privileged_accounts': {
-                'mfa_required': True,
-                'monitoring': True,
-                'regular_review': True
-            }
-        }
-    
-    def _identify_weak_passwords(self) -> List[str]:
-        """Identify accounts with weak passwords using various techniques"""
-        weak_accounts = []
-        
-        try:
-            # This would require appropriate permissions and careful implementation
-            # In practice, this might involve checking against password policies
-            # rather than actual password cracking
-            
-            for user in pwd.getpwall():
-                try:
-                    shadow_entry = spwd.getspnam(user.pw_name)
-                    
-                    # Check if password is in common password list
-                    # Note: This is a simplified example - real implementation
-                    # would need proper password security analysis
-                    
-                    if self._is_password_weak(shadow_entry):
-                        weak_accounts.append(user.pw_name)
-                        
-                except (KeyError, PermissionError):
-                    continue
-                    
-        except Exception:
+        except OSError:
             pass
-        
-        return weak_accounts
-    
-    def _parse_sudoers_files(self) -> List[Dict]:
-        """Parse sudoers configuration files"""
-        sudo_rules = []
-        
-        try:
-            cmd = "sudo -l -U '*' 2>/dev/null | grep -E '^User|^    '"
+
+    def _check_sudo_config(self):
+        """Check sudo configuration"""
+        if os.path.exists('/etc/sudoers'):
+            cmd = "sudo -l 2>/dev/null || echo 'Cannot check sudo'"
             returncode, stdout, stderr = self.run_command(cmd)
             
-            # Parse sudo output and extract rules
-            # This is a simplified version - real implementation would be more comprehensive
-            
-            current_user = None
-            for line in stdout.split('\n'):
-                if line.startswith('User '):
-                    current_user = line.split()[1]
-                elif line.strip() and current_user:
-                    sudo_rules.append({
-                        'user': current_user,
-                        'rule': line.strip(),
-                        'source_file': '/etc/sudoers'
-                    })
-        
-        except Exception:
-            pass
-        
-        return sudo_rules
+            # Check for dangerous sudo configurations
+            try:
+                # This requires appropriate permissions
+                cmd = "grep -E '(NOPASSWD:ALL|%.*ALL.*NOPASSWD)' /etc/sudoers /etc/sudoers.d/* 2>/dev/null || true"
+                returncode, stdout, stderr = self.run_command(cmd)
+                
+                if stdout.strip():
+                    self.add_finding(
+                        category="User Accounts",
+                        severity=SeverityLevel.HIGH,
+                        title="Permissive sudo configuration found",
+                        description="Found sudo rules that allow passwordless execution of all commands",
+                        recommendation="Review sudo configuration and require passwords for sensitive operations",
+                        details={"matches": stdout.strip().split('\n')}
+                    )
+            except:
+                pass
     
-    def _assess_sudo_rule_risk(self, rule: Dict) -> int:
-        """Assess risk level of sudo rule (0-5 scale)"""
-        risk_score = 0
-        rule_text = rule.get('rule', '').lower()
+    def _check_password_policies(self):
+        """Check password policy configuration"""
+        # Check if PAM password quality is configured
+        pam_files = ['/etc/pam.d/common-password', '/etc/pam.d/system-auth']
         
-        if 'nopasswd' in rule_text:
-            risk_score += 2
-        if 'all' in rule_text:
-            risk_score += 2
-        if '/bin/sh' in rule_text or '/bin/bash' in rule_text:
-            risk_score += 1
-        if 'root' in rule.get('user', ''):
-            risk_score += 1
-        
-        return min(risk_score, 5)
-    
-    def _inventory_auth_methods(self) -> Dict:
-        """Inventory available authentication methods"""
-        methods = {
-            'password': True,
-            'ssh_keys': self._check_ssh_keys_configured(),
-            'pam_modules': self._get_configured_pam_modules(),
-            'mfa_enabled': self._check_mfa_configured(),
-            'anonymous_access': self._check_anonymous_access()
-        }
-        
-        return methods
-    
-    def _check_mfa_configured(self) -> bool:
-        """Check if MFA is configured"""
-        mfa_modules = ['pam_google_authenticator', 'pam_yubico', 'pam_oath']
-        
-        for pam_file in ['/etc/pam.d/sshd', '/etc/pam.d/login', '/etc/pam.d/common-auth']:
-            if Path(pam_file).exists():
+        pam_configured = False
+        for pam_file in pam_files:
+            if os.path.exists(pam_file):
                 try:
                     with open(pam_file, 'r') as f:
                         content = f.read()
-                        for module in mfa_modules:
-                            if module in content:
-                                return True
-                except Exception:
-                    continue
+                        if 'pam_pwquality' in content or 'pam_cracklib' in content:
+                            pam_configured = True
+                            break
+                except OSError:
+                    pass
         
-        return False
-    
+        if not pam_configured:
+            self.add_finding(
+                category="User Accounts",
+                severity=SeverityLevel.MEDIUM,
+                title="No password quality checking configured",
+                description="PAM password quality modules not found",
+                recommendation="Configure pam_pwquality or pam_cracklib for password strength checking",
+                details={}
+            )
+
 class SSHConfigChecker(SecurityChecker):
     """Check SSH configuration for security issues"""
     
@@ -2024,7 +1273,7 @@ class AuditEngine:
     def _get_scan_info(self) -> Dict[str, Any]:
         """Get scan information dictionary"""
         return {
-            'timestamp': dt.now().isoformat(),
+            'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
             'version': '2.0.1' if self.phase2_available else __version__,
             'hostname': platform.node(),
