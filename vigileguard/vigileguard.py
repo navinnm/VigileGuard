@@ -6,7 +6,7 @@ A comprehensive security audit tool for Linux systems
 Repository: https://github.com/navinnm/VigileGuard
 Author: VigileGuard Development Team
 License: MIT
-Version: 1.0.6
+Version: 1.0.5
 """
 
 import os
@@ -22,6 +22,11 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# Add current directory to Python path to help with imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 # Import rich components with error handling
 RICH_AVAILABLE = True
@@ -44,7 +49,7 @@ except ImportError as e:
         def fit(text, **kwargs):
             return text
 
-__version__ = "1.0.6"
+__version__ = "1.0.5"
 
 # Global console for rich output
 console = Console()
@@ -623,17 +628,40 @@ class AuditEngine:
         # Try to add Phase 2 checkers if available
         self.phase2_available = False
         try:
-            # Import Phase 2 checkers at runtime to avoid circular imports
-            from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
-            self.checkers.extend([
-                WebServerSecurityChecker(),
-                NetworkSecurityChecker()
-            ])
-            if RICH_AVAILABLE:
-                console.print("✅ Phase 2 components loaded successfully", style="green")
-            else:
-                print("✅ Phase 2 components loaded successfully")
-            self.phase2_available = True
+            # Import Phase 2 checkers with multiple fallback methods
+            web_checkers = None
+            try:
+                # Try relative import first
+                from .web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+                web_checkers = (WebServerSecurityChecker, NetworkSecurityChecker)
+            except ImportError:
+                try:
+                    # Try absolute import
+                    from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
+                    web_checkers = (WebServerSecurityChecker, NetworkSecurityChecker)
+                except ImportError:
+                    # Try importing from current directory
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location(
+                        "web_security_checkers", 
+                        os.path.join(current_dir, "web_security_checkers.py")
+                    )
+                    if spec and spec.loader:
+                        web_mod = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(web_mod)
+                        web_checkers = (web_mod.WebServerSecurityChecker, web_mod.NetworkSecurityChecker)
+            
+            if web_checkers:
+                self.checkers.extend([
+                    web_checkers[0](),
+                    web_checkers[1]()
+                ])
+                if RICH_AVAILABLE:
+                    console.print("✅ Phase 2 components loaded successfully", style="green")
+                else:
+                    print("✅ Phase 2 components loaded successfully")
+                self.phase2_available = True
+            
         except ImportError as e:
             if RICH_AVAILABLE:
                 console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
@@ -645,7 +673,7 @@ class AuditEngine:
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '1.0.6' if self.phase2_available else __version__,
+            'version': '2.0.0' if self.phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -724,9 +752,29 @@ class AuditEngine:
         elif format_type == "html":
             # Try to use Phase 2 HTML reporter if available
             try:
-                from enhanced_reporting import HTMLReporter
-                html_reporter = HTMLReporter(self.all_findings, self._get_scan_info())
-                return html_reporter.generate_report("report.html")
+                # Try multiple import methods for enhanced_reporting
+                enhanced_reporting = None
+                try:
+                    from .enhanced_reporting import HTMLReporter
+                    enhanced_reporting = HTMLReporter
+                except ImportError:
+                    try:
+                        from enhanced_reporting import HTMLReporter
+                        enhanced_reporting = HTMLReporter
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            enhanced_reporting = enhanced_mod.HTMLReporter
+                
+                if enhanced_reporting:
+                    html_reporter = enhanced_reporting(self.all_findings, self._get_scan_info())
+                    return html_reporter.generate_report("report.html")
             except ImportError:
                 if RICH_AVAILABLE:
                     console.print("❌ HTML format requires Phase 2 components", style="red")
@@ -780,6 +828,13 @@ class AuditEngine:
         # Detailed findings
         if self.all_findings:
             if RICH_AVAILABLE:
+                severity_colors = {
+                    SeverityLevel.CRITICAL: "red",
+                    SeverityLevel.HIGH: "orange1", 
+                    SeverityLevel.MEDIUM: "yellow",
+                    SeverityLevel.LOW: "blue",
+                    SeverityLevel.INFO: "green"
+                }
                 for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
                     color = severity_colors.get(finding.severity, "white")
                     
@@ -853,14 +908,37 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         # Check if Phase 2 components are available
         phase2_available = False
         try:
-            # Try to import Phase 2 components
-            from web_security_checkers import WebServerSecurityChecker, NetworkSecurityChecker
-            from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
-            phase2_available = True
-            if RICH_AVAILABLE:
-                console.print("✅ Phase 2 features available", style="green")
-            else:
-                print("✅ Phase 2 features available")
+            # Try multiple import methods for Phase 2 components
+            phase2_integration = None
+            try:
+                from .phase2_integration import Phase2AuditEngine
+                from .enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
+                phase2_integration = Phase2AuditEngine
+                phase2_available = True
+            except ImportError:
+                try:
+                    from phase2_integration import Phase2AuditEngine
+                    from enhanced_reporting import ReportManager, HTMLReporter, ComplianceMapper
+                    phase2_integration = Phase2AuditEngine
+                    phase2_available = True
+                except ImportError:
+                    # Try importing from current directory
+                    import importlib.util
+                    phase2_spec = importlib.util.spec_from_file_location(
+                        "phase2_integration", 
+                        os.path.join(current_dir, "phase2_integration.py")
+                    )
+                    if phase2_spec and phase2_spec.loader:
+                        phase2_mod = importlib.util.module_from_spec(phase2_spec)
+                        phase2_spec.loader.exec_module(phase2_mod)
+                        phase2_integration = phase2_mod.Phase2AuditEngine
+                        phase2_available = True
+            
+            if phase2_available:
+                if RICH_AVAILABLE:
+                    console.print("✅ Phase 2 features available", style="green")
+                else:
+                    print("✅ Phase 2 features available")
         except ImportError as e:
             if output_format in ['html', 'compliance', 'all']:
                 if RICH_AVAILABLE:
@@ -883,14 +961,9 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                 print(f"⚠️ Phase 2 components not available: {e}")
         
         # Initialize appropriate engine based on available features
-        if phase2_available:
-            # Try to use Phase 2 enhanced engine
-            try:
-                from phase2_integration import Phase2AuditEngine
-                engine = Phase2AuditEngine(config, environment)
-            except ImportError:
-                # Fall back to Phase 1 engine with Phase 2 checkers
-                engine = AuditEngine(config)
+        if phase2_available and phase2_integration:
+            # Use Phase 2 enhanced engine
+            engine = phase2_integration(config, environment)
         else:
             # Use original Phase 1 engine
             engine = AuditEngine(config)
@@ -902,7 +975,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '1.0.6' if phase2_available else __version__,
+            'version': '2.0.0' if phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -914,9 +987,31 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
             # JSON output
             if phase2_available:
                 try:
-                    from enhanced_reporting import ReportManager
-                    report_manager = ReportManager(findings, scan_info)
-                    report_content = report_manager.generate_technical_report()
+                    # Try to import ReportManager
+                    report_manager = None
+                    try:
+                        from .enhanced_reporting import ReportManager
+                        report_manager = ReportManager
+                    except ImportError:
+                        try:
+                            from enhanced_reporting import ReportManager
+                            report_manager = ReportManager
+                        except ImportError:
+                            import importlib.util
+                            spec = importlib.util.spec_from_file_location(
+                                "enhanced_reporting", 
+                                os.path.join(current_dir, "enhanced_reporting.py")
+                            )
+                            if spec and spec.loader:
+                                enhanced_mod = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(enhanced_mod)
+                                report_manager = enhanced_mod.ReportManager
+                    
+                    if report_manager:
+                        rm = report_manager(findings, scan_info)
+                        report_content = rm.generate_technical_report()
+                    else:
+                        report_content = engine.generate_report('json')
                 except ImportError:
                     # Fall back to Phase 1 JSON generation
                     report_content = engine.generate_report('json')
@@ -949,14 +1044,43 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                 sys.exit(1)
             
             # HTML output (Phase 2)
-            from enhanced_reporting import HTMLReporter
-            html_reporter = HTMLReporter(findings, scan_info)
-            output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-            html_reporter.generate_report(output_file)
-            if RICH_AVAILABLE:
-                console.print(f"HTML report saved to {output_file}", style="green")
-            else:
-                print(f"HTML report saved to {output_file}")
+            try:
+                # Try to import HTMLReporter
+                html_reporter = None
+                try:
+                    from .enhanced_reporting import HTMLReporter
+                    html_reporter = HTMLReporter
+                except ImportError:
+                    try:
+                        from enhanced_reporting import HTMLReporter
+                        html_reporter = HTMLReporter
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            html_reporter = enhanced_mod.HTMLReporter
+                
+                if html_reporter:
+                    reporter = html_reporter(findings, scan_info)
+                    output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                    reporter.generate_report(output_file)
+                    if RICH_AVAILABLE:
+                        console.print(f"HTML report saved to {output_file}", style="green")
+                    else:
+                        print(f"HTML report saved to {output_file}")
+                else:
+                    raise ImportError("HTMLReporter not available")
+            except ImportError:
+                if RICH_AVAILABLE:
+                    console.print("❌ HTML format requires Phase 2 components", style="red")
+                else:
+                    print("❌ HTML format requires Phase 2 components")
+                sys.exit(1)
         
         elif output_format == 'compliance':
             if not phase2_available:
@@ -967,17 +1091,46 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                 sys.exit(1)
             
             # Compliance output (Phase 2)
-            from enhanced_reporting import ComplianceMapper
-            compliance_mapper = ComplianceMapper()
-            compliance_report = compliance_mapper.generate_compliance_report(findings)
-            output_file = output or f"vigileguard_compliance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            
-            with open(output_file, 'w') as f:
-                json.dump(compliance_report, f, indent=2, default=str)
-            if RICH_AVAILABLE:
-                console.print(f"Compliance report saved to {output_file}", style="green")
-            else:
-                print(f"Compliance report saved to {output_file}")
+            try:
+                # Try to import ComplianceMapper
+                compliance_mapper = None
+                try:
+                    from .enhanced_reporting import ComplianceMapper
+                    compliance_mapper = ComplianceMapper
+                except ImportError:
+                    try:
+                        from enhanced_reporting import ComplianceMapper
+                        compliance_mapper = ComplianceMapper
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            compliance_mapper = enhanced_mod.ComplianceMapper
+                
+                if compliance_mapper:
+                    mapper = compliance_mapper()
+                    compliance_report = mapper.generate_compliance_report(findings)
+                    output_file = output or f"vigileguard_compliance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    
+                    with open(output_file, 'w') as f:
+                        json.dump(compliance_report, f, indent=2, default=str)
+                    if RICH_AVAILABLE:
+                        console.print(f"Compliance report saved to {output_file}", style="green")
+                    else:
+                        print(f"Compliance report saved to {output_file}")
+                else:
+                    raise ImportError("ComplianceMapper not available")
+            except ImportError:
+                if RICH_AVAILABLE:
+                    console.print("❌ Compliance format requires Phase 2 components", style="red")
+                else:
+                    print("❌ Compliance format requires Phase 2 components")
+                sys.exit(1)
         
         elif output_format == 'all':
             if not phase2_available:
@@ -988,19 +1141,48 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                 sys.exit(1)
             
             # Generate all formats (Phase 2)
-            from enhanced_reporting import ReportManager
-            report_manager = ReportManager(findings, scan_info)
-            output_dir = output or './reports'
-            generated_files = report_manager.generate_all_formats(output_dir)
-            
-            if RICH_AVAILABLE:
-                console.print("📊 All reports generated:", style="bold green")
-                for format_type, file_path in generated_files.items():
-                    console.print(f"  {format_type.upper()}: {file_path}")
-            else:
-                print("📊 All reports generated:")
-                for format_type, file_path in generated_files.items():
-                    print(f"  {format_type.upper()}: {file_path}")
+            try:
+                # Try to import ReportManager
+                report_manager = None
+                try:
+                    from .enhanced_reporting import ReportManager
+                    report_manager = ReportManager
+                except ImportError:
+                    try:
+                        from enhanced_reporting import ReportManager
+                        report_manager = ReportManager
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            report_manager = enhanced_mod.ReportManager
+                
+                if report_manager:
+                    rm = report_manager(findings, scan_info)
+                    output_dir = output or './reports'
+                    generated_files = rm.generate_all_formats(output_dir)
+                    
+                    if RICH_AVAILABLE:
+                        console.print("📊 All reports generated:", style="bold green")
+                        for format_type, file_path in generated_files.items():
+                            console.print(f"  {format_type.upper()}: {file_path}")
+                    else:
+                        print("📊 All reports generated:")
+                        for format_type, file_path in generated_files.items():
+                            print(f"  {format_type.upper()}: {file_path}")
+                else:
+                    raise ImportError("ReportManager not available")
+            except ImportError:
+                if RICH_AVAILABLE:
+                    console.print("❌ 'all' format requires Phase 2 components", style="red")
+                else:
+                    print("❌ 'all' format requires Phase 2 components")
+                sys.exit(1)
         
         # Send notifications if enabled (Phase 2)
         if notifications and phase2_available:
