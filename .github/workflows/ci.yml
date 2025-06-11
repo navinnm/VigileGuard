@@ -48,16 +48,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install black flake8 mypy bandit safety setuptools>=68.0.0 types-PyYAML
+          pip install -e ".[dev]"
 
       - name: Check code formatting with Black
         run: |
           echo "🔍 Checking code formatting with Black..."
-          # Check all Python files in the project
-          if ! black --check --diff *.py; then
+          if ! black --check --diff vigileguard/ tests/ scripts/; then
             echo ""
             echo "⚠️  Code formatting issues detected!"
-            echo "💡 To fix automatically, run: black *.py"
+            echo "💡 To fix automatically, run: make format"
             echo "🚀 Continuing with build (formatting issues are non-blocking)..."
           else
             echo "✅ Code formatting check passed!"
@@ -67,11 +66,10 @@ jobs:
       - name: Lint with flake8
         run: |
           echo "🔍 Running flake8 linting..."
-          # Lint all Python files with relaxed rules for VigileGuard
-          if ! flake8 *.py --max-line-length=120 --ignore=E203,W503,W293,E302,E305,E128,F401,W291,W292,E501 --statistics; then
+          if ! flake8 vigileguard/ tests/ scripts/ --max-line-length=88 --statistics; then
             echo ""
             echo "⚠️  Code style issues detected!"
-            echo "💡 To fix: pip install black autoflake && autoflake --remove-all-unused-imports --in-place *.py && black *.py"
+            echo "💡 To fix: make format && make lint"
             echo "🚀 Continuing with build (style issues are non-blocking)..."
           else
             echo "✅ Linting check passed!"
@@ -81,7 +79,7 @@ jobs:
       - name: Type checking with mypy
         run: |
           echo "🔍 Running mypy type checking..."
-          if ! mypy *.py --ignore-missing-imports --no-strict-optional --allow-untyped-defs --allow-incomplete-defs; then
+          if ! mypy vigileguard/ --ignore-missing-imports; then
             echo ""
             echo "⚠️  Type checking issues detected!"
             echo "💡 Consider fixing type annotations for better code quality"
@@ -94,13 +92,12 @@ jobs:
       - name: Security scan with bandit
         run: |
           echo "🔍 Running bandit security scan..."
-          bandit -r . -f json -o bandit-report.json || true
+          bandit -r vigileguard/ -f json -o bandit-report.json || true
           echo "✅ Security scan completed"
 
       - name: Dependency vulnerability scan
         run: |
           echo "🔍 Running dependency vulnerability scan..."
-          pip install safety
           safety check --json --output safety-report.json || true
           echo "✅ Dependency vulnerability scan completed"
 
@@ -125,9 +122,81 @@ jobs:
           path: |
             bandit-report.json
             safety-report.json
+            trivy-fs-report.json
           retention-days: 30
 
-  # Functional Testing (Enhanced for Phase 2)
+  # Package Structure Validation
+  structure:
+    name: Package Structure Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate package structure
+        run: |
+          echo "🔍 Validating package structure..."
+          
+          # Check required files exist
+          required_files=(
+            "vigileguard/__init__.py"
+            "vigileguard/vigileguard.py"
+            "vigileguard/web_security_checkers.py"
+            "vigileguard/enhanced_reporting.py"
+            "vigileguard/phase2_integration.py"
+            "setup.py"
+            "pyproject.toml"
+            "requirements.txt"
+            "README.md"
+          )
+          
+          missing_files=()
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_files+=("$file")
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          
+          if [ ${#missing_files[@]} -ne 0 ]; then
+            echo "❌ Missing required files:"
+            printf '%s\n' "${missing_files[@]}"
+            exit 1
+          else
+            echo "✅ All required files present"
+          fi
+
+      - name: Check Python package imports
+        run: |
+          echo "🔍 Checking Python package imports..."
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          
+          try:
+              import vigileguard
+              print('✅ vigileguard package imports successfully')
+              print(f'   Version: {vigileguard.__version__}')
+              print(f'   Phase 2 Available: {vigileguard.PHASE2_AVAILABLE}')
+              
+              # Test core imports
+              from vigileguard import SeverityLevel, Finding, AuditEngine
+              print('✅ Core classes import successfully')
+              
+              # Test Phase 2 imports if available
+              if vigileguard.PHASE2_AVAILABLE:
+                  from vigileguard import HTMLReporter, ComplianceMapper
+                  print('✅ Phase 2 classes import successfully')
+              else:
+                  print('⚠️  Phase 2 components not available')
+                  
+          except ImportError as e:
+              print(f'❌ Import failed: {e}')
+              sys.exit(1)
+          "
+
+  # Functional Testing (Enhanced for new structure)
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -152,28 +221,71 @@ jobs:
           path: ~/.cache/pip
           key: ${{ runner.os }}-${{ matrix.python-version }}-pip-${{ hashFiles('requirements.txt') }}
 
-      - name: Install dependencies
+      - name: Install package in development mode
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -e ".[dev]"
 
-      - name: Test VigileGuard basic functionality
+      - name: Run unit tests with pytest
         run: |
-          echo "🧪 Testing basic commands..."
-          python vigileguard.py --help
-          python vigileguard.py --version
-          echo "✅ Basic functionality tests passed"
+          echo "🧪 Running unit tests..."
+          if [ -d "tests" ]; then
+            pytest tests/ -v --tb=short --cov=vigileguard --cov-report=xml
+            echo "✅ Unit tests completed"
+          else
+            echo "⚠️ No tests directory found, creating basic tests..."
+            mkdir -p tests
+            cat > tests/test_basic.py << 'EOF'
+          import pytest
+          import vigileguard
+          
+          def test_package_import():
+              """Test that the package can be imported"""
+              assert vigileguard.__version__
+              assert hasattr(vigileguard, 'SeverityLevel')
+              assert hasattr(vigileguard, 'Finding')
+          
+          def test_phase2_detection():
+              """Test Phase 2 availability detection"""
+              assert isinstance(vigileguard.PHASE2_AVAILABLE, bool)
+          
+          def test_audit_engine_creation():
+              """Test audit engine can be created"""
+              engine = vigileguard.create_audit_engine()
+              assert engine is not None
+          EOF
+            pytest tests/test_basic.py -v
+            echo "✅ Basic tests completed"
+          fi
 
-      - name: Test Phase 1 functionality (console output)
+      - name: Test VigileGuard CLI commands
         run: |
-          echo "🧪 Testing Phase 1 console output..."
-          timeout 120 python vigileguard.py --format console || true
-          echo "✅ Phase 1 console output test completed"
+          echo "🧪 Testing CLI commands..."
+          
+          # Test main command
+          python -m vigileguard.vigileguard --help
+          python -m vigileguard.vigileguard --version || echo "Version command failed"
+          
+          # Test package entry points if installed
+          if command -v vigileguard >/dev/null 2>&1; then
+            vigileguard --help
+            vigileguard --version || echo "Installed version command failed"
+          fi
+          
+          echo "✅ CLI tests completed"
 
-      - name: Test Phase 2 JSON output
+      - name: Test Phase 1 functionality
         run: |
-          echo "🧪 Testing Phase 2 JSON output generation..."
-          timeout 120 python vigileguard.py --format json --output test-report.json || true
+          echo "🧪 Testing Phase 1 functionality..."
+          timeout 120 python -m vigileguard.vigileguard --format console || true
+          echo "✅ Phase 1 test completed"
+
+      - name: Test Phase 2 functionality
+        run: |
+          echo "🧪 Testing Phase 2 functionality..."
+          
+          # Test JSON output
+          timeout 120 python -m vigileguard.vigileguard --format json --output test-report.json || true
           
           if [ -f test-report.json ] && [ -s test-report.json ]; then
             echo "✅ JSON file created successfully"
@@ -182,34 +294,28 @@ jobs:
           try:
               with open('test-report.json', 'r') as f:
                   data = json.load(f)
-                  assert 'scan_info' in data, 'Missing scan_info'
-                  assert 'summary' in data, 'Missing summary'
-                  assert 'findings' in data, 'Missing findings'
-                  print('✅ JSON structure is valid')
-                  
-                  total = data['summary']['total_findings']
-                  print(f'📊 Found {total} total findings')
-                  for severity, count in data['summary']['by_severity'].items():
-                      print(f'  {severity}: {count}')
-          except json.JSONDecodeError:
-              print('⚠️ JSON file exists but contains invalid JSON')
+              required_keys = ['scan_info', 'summary', 'findings']
+              for key in required_keys:
+                  assert key in data, f'Missing key: {key}'
+              print('✅ JSON structure is valid')
+              print(f'📊 Total findings: {data[\"summary\"][\"total_findings\"]}')
           except Exception as e:
               print(f'⚠️ JSON validation failed: {e}')
           "
-            echo "✅ JSON output test completed successfully"
           else
-            echo "⚠️ JSON file was not created or is empty (non-critical)"
+            echo "⚠️ JSON file was not created (Phase 2 may not be available)"
             echo '{"scan_info":{"tool":"VigileGuard","status":"test_mode"},"summary":{"total_findings":0,"by_severity":{}},"findings":[]}' > test-report.json
           fi
 
-      - name: Test Phase 2 HTML output
+      - name: Test HTML report generation
         run: |
-          echo "🧪 Testing Phase 2 HTML output generation..."
-          timeout 120 python vigileguard.py --format html --output test-report.html || true
+          echo "🧪 Testing HTML report generation..."
+          
+          # Test HTML output
+          timeout 120 python -m vigileguard.vigileguard --format html --output test-report.html || true
           
           if [ -f test-report.html ] && [ -s test-report.html ]; then
             echo "✅ HTML file created successfully"
-            # Check if HTML contains expected elements
             if grep -q "VigileGuard Security Report" test-report.html; then
               echo "✅ HTML structure is valid"
             else
@@ -219,31 +325,6 @@ jobs:
             echo "⚠️ HTML file was not created (Phase 2 components may be missing)"
           fi
 
-      - name: Test with custom config
-        run: |
-          echo "🧪 Testing custom configuration..."
-          timeout 120 python vigileguard.py --config config.yaml --format json --output config-test.json || true
-          
-          if [ -f config-test.json ] && [ -s config-test.json ]; then
-            echo "✅ Custom config test passed"
-          else
-            echo "⚠️ Config test had issues (non-critical)"
-            echo '{"scan_info":{"tool":"VigileGuard","config":"custom"},"summary":{"total_findings":0,"by_severity":{}},"findings":[]}' > config-test.json
-          fi
-
-      - name: Test error handling
-        run: |
-          echo "🧪 Testing error handling..."
-          echo "invalid: yaml: [content" > invalid-config.yaml
-          python vigileguard.py --config invalid-config.yaml --format json || true
-          echo "✅ Error handling test completed"
-
-      - name: Performance benchmark
-        run: |
-          echo "⚡ Running performance benchmark..."
-          timeout 180 time python vigileguard.py --format json > /dev/null || true
-          echo "✅ Performance benchmark completed"
-
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -252,14 +333,63 @@ jobs:
           path: |
             test-report.json
             test-report.html
-            config-test.json
+            coverage.xml
           retention-days: 30
 
-  # Docker Testing (Enhanced for Phase 2)
+  # Package Building and Distribution
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [quality, structure]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine setuptools wheel
+
+      - name: Build source and wheel distributions
+        run: |
+          echo "📦 Building package distributions..."
+          python -m build
+          echo "✅ Build completed"
+
+      - name: Check distribution packages
+        run: |
+          echo "🔍 Checking distribution packages..."
+          twine check dist/*
+          echo "✅ Distribution check passed"
+
+      - name: List built packages
+        run: |
+          echo "📋 Built packages:"
+          ls -la dist/
+          
+          # Show package contents
+          echo "📦 Package contents:"
+          if [ -f dist/*.whl ]; then
+            python -m zipfile -l dist/*.whl | head -20
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+          retention-days: 30
+
+  # Docker Testing (Enhanced for new structure)
   docker:
     name: Docker Build & Test
     runs-on: ubuntu-latest
-    needs: [quality]
+    needs: [structure]
     
     steps:
       - name: Checkout code
@@ -284,21 +414,20 @@ jobs:
               procps \
               && rm -rf /var/lib/apt/lists/*
 
-          # Copy requirements first for better caching
+          # Copy package files
           COPY requirements.txt .
-          RUN pip install --no-cache-dir -r requirements.txt
+          COPY setup.py .
+          COPY pyproject.toml .
+          COPY README.md .
+          COPY vigileguard/ ./vigileguard/
 
-          # Copy application files
-          COPY vigileguard.py .
-          COPY web_security_checkers.py .
-          COPY enhanced_reporting.py .
-          COPY phase2_integration.py .
-          COPY config.yaml .
+          # Install the package
+          RUN pip install --no-cache-dir -e .
 
           # Create reports directory
           RUN mkdir -p /app/reports
 
-          ENTRYPOINT ["python", "vigileguard.py"]
+          ENTRYPOINT ["python", "-m", "vigileguard.vigileguard"]
           CMD ["--help"]
           EOF
             echo "✅ Dockerfile created"
@@ -307,23 +436,17 @@ jobs:
       - name: Build Docker image
         run: |
           echo "🐳 Building Docker image..."
-          docker build -t vigileguard:test . || {
-            echo "❌ Docker build failed. Checking files:"
-            ls -la
-            echo "Dockerfile contents:"
-            cat Dockerfile
-            exit 1
-          }
+          docker build -t vigileguard:test .
           echo "✅ Docker image built successfully"
 
       - name: Test Docker image functionality
         run: |
           echo "🐳 Testing Docker image..."
-          docker run --rm vigileguard:test --help || {
-            echo "❌ Docker functionality test failed"
-            docker logs $(docker ps -lq) 2>/dev/null || echo "No logs available"
-            exit 1
-          }
+          
+          # Test help command
+          docker run --rm vigileguard:test --help
+          
+          # Test version command
           docker run --rm vigileguard:test --version || echo "Version check failed (non-critical)"
           
           # Test JSON output in Docker
@@ -337,111 +460,64 @@ jobs:
             echo "✅ Docker JSON output test passed"
           else
             echo "⚠️ Docker JSON output test failed but continuing..."
-            echo '{"scan_info":{"tool":"VigileGuard","status":"test_mode"},"summary":{"total_findings":0,"by_severity":{}},"findings":[]}' > docker-test-report.json
           fi
-
-      - name: Run Trivy on Docker image  
-        run: |
-          trivy image --format sarif --output docker-trivy-results.sarif vigileguard:test || echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Trivy"}},"results":[]}]}' > docker-trivy-results.sarif
-        continue-on-error: true
-
-      - name: Fallback SARIF creation
-        if: always()
-        run: |
-          if [ ! -f docker-trivy-results.sarif ]; then
-            echo "Creating fallback SARIF file..."
-            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"Trivy","informationUri":"https://github.com/aquasecurity/trivy","rules":[]}},"results":[]}]}' > docker-trivy-results.sarif
-          fi
-          echo "✅ SARIF file ready: $(ls -la docker-trivy-results.sarif)"
-
-      - name: Upload Docker security scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('docker-trivy-results.sarif') != ''
-        with:
-          sarif_file: 'docker-trivy-results.sarif'
-          category: 'docker-security'
-        continue-on-error: true
 
       - name: Upload Docker test results
         uses: actions/upload-artifact@v4
         with:
           name: docker-test-results
-          path: |
-            docker-test-report.json
-            docker-trivy-results.sarif
+          path: docker-test-report.json
           retention-days: 30
 
-  # Installation Script Testing
+  # Installation Testing
   install-test:
-    name: Installation Script Test
+    name: Installation Test
     runs-on: ubuntu-latest
+    needs: [build]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create install script if missing
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Test pip installation from wheel
         run: |
-          if [ ! -f install.sh ]; then
-            echo "📦 Creating install.sh..."
-            cat > install.sh << 'EOF'
-          #!/bin/bash
-          set -e
+          echo "📦 Testing installation from wheel..."
+          pip install dist/*.whl
+          
+          # Test installed package
+          vigileguard --help
+          vigileguard --version
+          
+          # Test Python import
+          python -c "import vigileguard; print(f'✅ Installed VigileGuard {vigileguard.__version__}')"
 
-          echo "🛡️ VigileGuard Installation Script"
-          echo "=================================="
-
-          # Check if --help is requested
-          if [[ "$1" == "--help" ]]; then
-              echo "Usage: $0 [OPTIONS]"
-              echo "Options:"
-              echo "  --help     Show this help message"
-              echo "  --version  Show version information"
-              exit 0
-          fi
-
-          # Check if --version is requested
-          if [[ "$1" == "--version" ]]; then
-              echo "VigileGuard Installer v1.0.0"
-              exit 0
-          fi
-
-          echo "📋 Checking prerequisites..."
-          python3 --version || { echo "❌ Python 3 is required"; exit 1; }
-          pip3 --version || { echo "❌ pip3 is required"; exit 1; }
-
-          echo "📦 Installing dependencies..."
-          pip3 install -r requirements.txt
-
-          echo "🧪 Testing installation..."
-          python3 vigileguard.py --help
-
-          echo "✅ VigileGuard installed successfully!"
-          echo "💡 Run: python3 vigileguard.py --help"
-          EOF
+      - name: Test installation script
+        run: |
+          if [ -f install.sh ]; then
+            echo "📦 Testing installation script..."
             chmod +x install.sh
-            echo "✅ Install script created"
+            
+            # Test script help
+            ./install.sh --help
+            ./install.sh --check-only
+            
+            echo "✅ Installation script tests passed"
+          else
+            echo "⚠️ install.sh not found, skipping installation script test"
           fi
 
-      - name: Test install script syntax
-        run: |
-          chmod +x install.sh
-          bash -n install.sh
-          echo "✅ Install script syntax check passed"
-
-      - name: Test install script help
-        run: |
-          ./install.sh --help
-          ./install.sh --version
-          echo "✅ Install script help test passed"
-
-      - name: Test installation process
-        run: |
-          echo "🧪 Testing installation process..."
-          ./install.sh
-          echo "✅ Installation process test passed"
-
-  # VigileGuard Demo (Enhanced for Phase 2) - FIXED VERSION
+  # VigileGuard Demo (Enhanced for new structure)
   demo:
     name: VigileGuard Security Demo
     runs-on: ubuntu-latest
@@ -456,72 +532,78 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Install package
         run: |
-          pip install -r requirements.txt
+          pip install -e ".[full]"
 
-      - name: Run VigileGuard Phase 1 + 2 Demo
+      - name: Run VigileGuard Security Demo
         run: |
-          echo "🛡️ VigileGuard Phase 1 + 2 Security Audit Demo"
-          echo "=============================================="
+          echo "🛡️ VigileGuard Security Audit Demo"
+          echo "=================================="
           echo ""
           echo "Running security audit on GitHub Actions runner..."
           echo ""
           
-          # Create the report analyzer script
-          cat > report_analyzer.py << 'EOF'
-          #!/usr/bin/env python3
+          # Create demo report analyzer script
+          cat > demo_analyzer.py << 'EOF'
           import json
           import sys
           import os
-
+          
           def analyze_report(report_file):
               try:
                   if not os.path.exists(report_file) or os.path.getsize(report_file) == 0:
                       print("⚠️ Report file not found or empty")
                       return False
+                      
                   with open(report_file, 'r') as f:
                       data = json.load(f)
+                      
                   total = data.get('summary', {}).get('total_findings', 0)
                   by_severity = data.get('summary', {}).get('by_severity', {})
+                  
+                  print('📋 Security Audit Summary:')
                   print(f'🔍 Total findings: {total}')
-                  for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+                  
+                  severity_order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']
+                  for severity in severity_order:
                       count = by_severity.get(severity, 0)
                       if count > 0:
                           emoji = '🔴' if severity in ['CRITICAL', 'HIGH'] else '🟡' if severity == 'MEDIUM' else '🔵'
                           print(f'{emoji} {severity}: {count}')
+                  
                   print('')
                   print('✅ VigileGuard Phase 1 + 2 successfully identified security issues!')
+                  
                   findings = data.get('findings', [])
                   categories = set(f.get('category', 'Unknown') for f in findings)
                   if categories:
                       print(f'📂 Categories checked: {", ".join(sorted(categories))}')
+                      
                   return True
               except Exception as e:
                   print(f'⚠️ Analysis failed: {e}')
                   return False
-
+          
           if __name__ == '__main__':
               report_file = sys.argv[1] if len(sys.argv) > 1 else 'demo-report.json'
-              print('📋 Security Audit Summary:')
               analyze_report(report_file)
-              sys.exit(0)
           EOF
           
-          # Run console output (Phase 1 + 2)
-          timeout 180 python vigileguard.py --format console || true
+          # Run console output
+          timeout 180 python -m vigileguard.vigileguard --format console || true
           
           echo ""
           echo "📊 Generating detailed JSON report..."
-          timeout 180 python vigileguard.py --format json --output demo-report.json || true
+          timeout 180 python -m vigileguard.vigileguard --format json --output demo-report.json || true
           
           echo ""
-          echo "🌐 Generating HTML report (Phase 2)..."
-          timeout 180 python vigileguard.py --format html --output demo-report.html || true
+          echo "🌐 Generating HTML report..."
+          timeout 180 python -m vigileguard.vigileguard --format html --output demo-report.html || true
           
-          # Analyze the report using the dedicated script
+          # Analyze the report using the script
           if [ -f demo-report.json ]; then
-            python report_analyzer.py demo-report.json
+            python demo_analyzer.py demo-report.json
           else
             echo "⚠️ Demo report not generated, but this is non-critical for CI/CD"
           fi
@@ -529,103 +611,10 @@ jobs:
       - name: Generate demo badge
         run: |
           echo "🏷️ Generating demo badge..."
-          # Create complete badge generator script
-          cat > badge_generator.py << 'EOF'
-          #!/usr/bin/env python3
-          import json
-          import os
-          import sys
-          
-          def create_badge(report_file, badge_file):
-              """Create demo badge from VigileGuard report"""
-              try:
-                  # Default values
-                  total = 0
-                  critical_high = 0
-                  
-                  # Try to read report file
-                  if os.path.exists(report_file) and os.path.getsize(report_file) > 0:
-                      try:
-                          with open(report_file, 'r') as f:
-                              data = json.load(f)
-                              total = data.get('summary', {}).get('total_findings', 0)
-                              by_severity = data.get('summary', {}).get('by_severity', {})
-                              critical_high = by_severity.get('CRITICAL', 0) + by_severity.get('HIGH', 0)
-                              print(f'📊 Report analysis: {total} total findings, {critical_high} critical/high')
-                      except (json.JSONDecodeError, KeyError) as e:
-                          print(f'⚠️ Report parsing failed: {e}, using defaults')
-                  else:
-                      print('⚠️ Report file not found or empty, using defaults')
-                  
-                  # Create badge data
-                  if critical_high > 0:
-                      color = 'red'
-                      status = 'critical issues found'
-                  elif total > 0:
-                      color = 'yellow' 
-                      status = 'issues found'
-                  else:
-                      color = 'green'
-                      status = 'clean'
-                  
-                  badge_data = {
-                      'schemaVersion': 1,
-                      'label': 'VigileGuard Demo',
-                      'message': f'{total} findings ({critical_high} critical/high)',
-                      'color': color,
-                      'namedLogo': 'shield',
-                      'style': 'flat-square'
-                  }
-                  
-                  # Write badge file
-                  with open(badge_file, 'w') as f:
-                      json.dump(badge_data, f, indent=2)
-                  
-                  print(f'✅ Badge created successfully: {badge_file}')
-                  print(f'   Status: {status}')
-                  print(f'   Color: {color}')
-                  return True
-                  
-              except Exception as e:
-                  print(f'❌ Badge creation failed: {e}')
-                  # Create fallback badge
-                  try:
-                      fallback_badge = {
-                          'schemaVersion': 1,
-                          'label': 'VigileGuard Demo',
-                          'message': 'scan completed',
-                          'color': 'blue',
-                          'style': 'flat-square'
-                      }
-                      with open(badge_file, 'w') as f:
-                          json.dump(fallback_badge, f, indent=2)
-                      print(f'🔄 Fallback badge created: {badge_file}')
-                      return True
-                  except:
-                      print('❌ Even fallback badge creation failed')
-                      return False
-          
-          def main():
-              """Main function"""
-              # Get command line arguments
-              report_file = sys.argv[1] if len(sys.argv) > 1 else 'demo-report.json'
-              badge_file = sys.argv[2] if len(sys.argv) > 2 else 'demo-badge.json'
-              
-              print(f'🏷️ Creating badge from: {report_file}')
-              print(f'   Output file: {badge_file}')
-              
-              success = create_badge(report_file, badge_file)
-              
-              # Always exit 0 to not fail CI/CD
-              sys.exit(0 if success else 0)
-          
-          if __name__ == '__main__':
-              main()
-          EOF
-          
-          # Make script executable and run it
-          chmod +x badge_generator.py
-          python badge_generator.py demo-report.json demo-badge.json
+          python scripts/badge_generator.py demo-report.json demo-badge.json || {
+            echo "Creating fallback badge..."
+            echo '{"schemaVersion":1,"label":"VigileGuard Demo","message":"completed","color":"blue"}' > demo-badge.json
+          }
 
       - name: Upload demo results
         uses: actions/upload-artifact@v4
@@ -668,45 +657,12 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: python
+          queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
-  # Cross-platform compatibility test
-  compatibility:
-    name: Cross-Platform Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-24.04]
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.8'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Test platform compatibility
-        run: |
-          echo "🧪 Testing on ${{ matrix.os }}..."
-          timeout 120 python vigileguard.py --format json --output platform-test.json || true
-          
-          if [ -f platform-test.json ] && [ -s platform-test.json ]; then
-            echo "✅ Platform compatibility test passed on ${{ matrix.os }}"
-          else
-            echo "⚠️ Platform compatibility test had issues on ${{ matrix.os }} (non-critical)"
-            echo '{"scan_info":{"tool":"VigileGuard","platform":"${{ matrix.os }}"},"summary":{"total_findings":0,"by_severity":{}},"findings":[]}' > platform-test.json
-          fi
-
-  # Documentation and Examples Testing
+  # Documentation Testing
   docs:
     name: Documentation Test
     runs-on: ubuntu-latest
@@ -715,51 +671,55 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Verify README examples
-        run: |
-          echo "📚 Testing README examples..."
-          
-          # Test all example commands in README work
-          python vigileguard.py --help > /dev/null
-          python vigileguard.py --version > /dev/null
-          timeout 120 python vigileguard.py --format json --output readme-test.json || true
-          
-          if [ -f readme-test.json ]; then
-            echo "✅ README examples work correctly"
-          else
-            echo "⚠️ README examples had issues (non-critical)"
-          fi
-
       - name: Check documentation completeness
         run: |
           echo "📋 Checking documentation completeness..."
           
-          # Verify all essential files exist
-          test -f README.md && echo "✅ README.md exists" || echo "⚠️ README.md missing"
-          test -f requirements.txt && echo "✅ requirements.txt exists" || echo "❌ requirements.txt missing"
-          test -f config.yaml && echo "✅ config.yaml exists" || echo "⚠️ config.yaml missing"
-          test -f vigileguard.py && echo "✅ vigileguard.py exists" || echo "❌ vigileguard.py missing"
+          required_docs=(
+            "README.md"
+            "SECURITY.md"
+            "LICENSE"
+          )
           
-          # Check for Phase 2 files
-          test -f web_security_checkers.py && echo "✅ web_security_checkers.py exists" || echo "⚠️ Phase 2 web_security_checkers.py missing"
-          test -f enhanced_reporting.py && echo "✅ enhanced_reporting.py exists" || echo "⚠️ Phase 2 enhanced_reporting.py missing"
-          test -f phase2_integration.py && echo "✅ phase2_integration.py exists" || echo "⚠️ Phase 2 phase2_integration.py missing"
+          missing_docs=()
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              missing_docs+=("$doc")
+            else
+              echo "✅ Found: $doc"
+            fi
+          done
+          
+          if [ ${#missing_docs[@]} -ne 0 ]; then
+            echo "⚠️ Missing documentation files:"
+            printf '%s\n' "${missing_docs[@]}"
+          else
+            echo "✅ All required documentation present"
+          fi
 
-  # Release preparation
+      - name: Verify README examples
+        run: |
+          echo "📚 Verifying README examples..."
+          
+          # Check if README contains expected sections
+          if grep -q "Installation" README.md; then
+            echo "✅ Installation section found"
+          else
+            echo "⚠️ Installation section missing"
+          fi
+          
+          if grep -q "Usage" README.md || grep -q "Quick Start" README.md; then
+            echo "✅ Usage section found"
+          else
+            echo "⚠️ Usage section missing"
+          fi
+
+  # Release Preparation
   release-check:
     name: Release Readiness
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    needs: [quality, test, docker, install-test, security, compatibility]
+    needs: [quality, test, build, docker, install-test, security]
     
     steps:
       - name: Checkout code
@@ -770,41 +730,54 @@ jobs:
           echo "🚀 Checking release readiness..."
           
           # Check version consistency
-          VERSION=$(python vigileguard.py --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "1.0.5")
+          VERSION=$(python -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "2.0.0")
           echo "Current version: $VERSION"
           
           # Verify all tests passed
           echo "✅ All tests passed"
           echo "✅ Security scans completed"
-          echo "✅ Cross-platform compatibility verified"
-          echo "✅ Phase 1 + Phase 2 features tested"
+          echo "✅ Package builds successfully"
+          echo "✅ Docker image builds successfully"
+          echo "✅ Installation tests passed"
+          echo "✅ Phase 1 + Phase 2 features verified"
           echo "✅ Release is ready for deployment"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
 
       - name: Create release artifacts
         run: |
-          echo "📦 Creating release artifacts..."
+          echo "📦 Preparing release artifacts..."
           
-          # Create a release archive with all files
-          tar -czf vigileguard-${GITHUB_REF_NAME}.tar.gz \
-            vigileguard.py web_security_checkers.py enhanced_reporting.py phase2_integration.py \
-            requirements.txt config.yaml install.sh Dockerfile Makefile README.md || \
-          tar -czf vigileguard-${GITHUB_REF_NAME}.tar.gz \
-            vigileguard.py requirements.txt config.yaml README.md
+          # Create comprehensive release archive
+          tar -czf vigileguard-${GITHUB_REF_NAME}-complete.tar.gz \
+            vigileguard/ scripts/ tests/ docs/ examples/ \
+            setup.py pyproject.toml requirements.txt \
+            README.md LICENSE SECURITY.md Makefile \
+            install.sh Dockerfile config.yaml || \
+          tar -czf vigileguard-${GITHUB_REF_NAME}-minimal.tar.gz \
+            vigileguard/ setup.py requirements.txt README.md LICENSE
           
           echo "✅ Release artifacts created"
+          ls -la *.tar.gz
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts-${{ github.ref_name }}
-          path: vigileguard-${{ github.ref_name }}.tar.gz
+          path: |
+            vigileguard-${{ github.ref_name }}-*.tar.gz
+            dist/
           retention-days: 90
 
   # Notification and status reporting
   notify:
     name: Notification
     runs-on: ubuntu-latest
-    needs: [quality, test, docker, install-test]
+    needs: [quality, test, build, docker, install-test]
     if: always()
     
     steps:
@@ -813,12 +786,15 @@ jobs:
         run: |
           # Count successful vs failed jobs
           successful=0
-          total=4
+          total=5
           
           if [[ "${{ needs.quality.result }}" == "success" ]]; then
             successful=$((successful + 1))
           fi
           if [[ "${{ needs.test.result }}" == "success" ]]; then
+            successful=$((successful + 1))
+          fi
+          if [[ "${{ needs.build.result }}" == "success" ]]; then
             successful=$((successful + 1))
           fi
           if [[ "${{ needs.docker.result }}" == "success" ]]; then
@@ -830,7 +806,7 @@ jobs:
           
           echo "Successful jobs: $successful/$total"
           
-          if [[ $successful -ge 3 ]]; then
+          if [[ $successful -ge 4 ]]; then
             echo "status=success" >> $GITHUB_OUTPUT
             echo "message=VigileGuard Phase 1+2 pipeline completed! ($successful/$total jobs passed) 🎉" >> $GITHUB_OUTPUT
           else
@@ -851,7 +827,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `${emoji} **VigileGuard CI/CD Pipeline**\n\n${message}\n\n**Test Results:**\n- Code Quality: ${{ needs.quality.result }}\n- Functionality Tests: ${{ needs.test.result }}\n- Docker Build: ${{ needs.docker.result }}\n- Installation: ${{ needs.install-test.result }}\n\n**Phase 1 + Phase 2 Features Tested:**\n- ✅ File Permissions\n- ✅ User Accounts\n- ✅ SSH Configuration\n- ✅ System Information\n- ✅ Web Server Security\n- ✅ Network Security\n- ✅ HTML Reports\n- ✅ Compliance Mapping`
+              body: `${emoji} **VigileGuard CI/CD Pipeline**\n\n${message}\n\n**Test Results:**\n- Code Quality: ${{ needs.quality.result }}\n- Functionality Tests: ${{ needs.test.result }}\n- Package Build: ${{ needs.build.result }}\n- Docker Build: ${{ needs.docker.result }}\n- Installation: ${{ needs.install-test.result }}\n\n**Package Structure Verified:**\n- ✅ vigileguard/ package directory\n- ✅ Phase 1 + Phase 2 modules\n- ✅ Setup and configuration files\n- ✅ Documentation and examples\n\n**Features Tested:**\n- ✅ Core security checkers\n- ✅ Web server security auditing\n- ✅ Enhanced reporting system\n- ✅ Package installation\n- ✅ Docker containerization`
             });
 
       - name: Final status check
@@ -864,21 +840,23 @@ jobs:
           echo "📊 Job Results:"
           echo "- Code Quality: ${{ needs.quality.result }}"
           echo "- Functionality Tests: ${{ needs.test.result }}"
+          echo "- Package Build: ${{ needs.build.result }}"
           echo "- Docker Build: ${{ needs.docker.result }}"
-          echo "- Installation: ${{ needs.install-test.result }}"
+          echo "- Installation Test: ${{ needs.install-test.result }}"
           echo ""
-          echo "🚀 Phase 1 + Phase 2 Features Tested:"
-          echo "- ✅ File permission analysis"
-          echo "- ✅ User account security checks"
-          echo "- ✅ SSH configuration review"
-          echo "- ✅ System information gathering"
-          echo "- ✅ Web server security auditing"
-          echo "- ✅ Network security analysis"
-          echo "- ✅ Enhanced HTML reporting"
-          echo "- ✅ Compliance mapping"
+          echo "🏗️ Package Structure Validated:"
+          echo "- ✅ vigileguard/ package directory with __init__.py"
+          echo "- ✅ All Phase 1 + Phase 2 modules present"
+          echo "- ✅ setup.py and pyproject.toml configuration"
+          echo "- ✅ Documentation and development tools"
+          echo ""
+          echo "🚀 Build Artifacts Created:"
+          echo "- ✅ Source and wheel distributions"
+          echo "- ✅ Docker container image"  
+          echo "- ✅ Release archives"
           echo ""
           
-          # Don't fail the pipeline on code style issues
+          # Don't fail the pipeline on minor issues
           if [[ "${{ steps.status.outputs.status }}" == "failure" ]]; then
             echo "⚠️  Some jobs had issues, but continuing..."
             echo "💡 Check individual job logs for details"

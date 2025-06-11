@@ -1,466 +1,456 @@
 #!/bin/bash
-set -e
-
 # VigileGuard Installation Script
-# Repository: https://github.com/navinnm/VigileGuard
-# This script installs VigileGuard on Linux systems
+# Installs VigileGuard with Phase 1 + Phase 2 components
 
-REPO_URL="https://github.com/navinnm/VigileGuard"
-INSTALL_DIR="/opt/vigileguard"
-BIN_DIR="/usr/local/bin"
-CONFIG_DIR="/etc/vigileguard"
+set -e
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-# VigileGuard ASCII Art
-show_banner() {
-    echo -e "${BLUE}"
-    cat << 'EOF'
-    ____   ____.__       .__.__         ________                       .___
-    \   \ /   /|__| ____ |__|  |   ____ /  _____/ __ _______ _______  __| _/
-     \   Y   / |  |/ ___\|  |  | _/ __ \   \  ___|  |  \__  \\_  __ \/ __ | 
-      \     /  |  / /_/  >  |  |_\  ___/|    \_\  \  |  // __ \|  | \/ /_/ | 
-       \___/   |__\___  /|__|____/\___  >\______  /____/(____  /__|  \____ | 
-                 /_____/              \/        \/           \/           \/ 
-    
-    Linux Security Audit Tool - Your Vigilant Guardian
-EOF
-    echo -e "${NC}"
-}
+# Script configuration
+SCRIPT_NAME="VigileGuard Installer"
+VERSION="2.0.0"
+REPO_URL="https://github.com/navinnm/VigileGuard"
+PYTHON_MIN_VERSION="3.8"
 
-# Logging functions
-log_info() {
+# Installation options
+INSTALL_TYPE="user"  # user, system, venv
+INSTALL_DIR=""
+CREATE_VENV=false
+ENABLE_NOTIFICATIONS=false
+SETUP_CRON=false
+
+# Function to print colored output
+print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-log_success() {
+print_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-log_error() {
+print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-log_step() {
-    echo -e "${PURPLE}[STEP]${NC} $1"
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-# Check if running as root
-check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        INSTALL_DIR="/opt/vigileguard"
-        BIN_DIR="/usr/local/bin"
-        CONFIG_DIR="/etc/vigileguard"
-        log_info "Installing as root to system directories"
-    else
-        INSTALL_DIR="$HOME/.local/share/vigileguard"
-        BIN_DIR="$HOME/.local/bin"
-        CONFIG_DIR="$HOME/.config/vigileguard"
-        log_warn "Installing as regular user to $INSTALL_DIR"
-    fi
-}
-
-# Check system requirements
-check_requirements() {
-    log_step "Checking system requirements..."
-    
-    # Check Python version
-    if ! command -v python3 &> /dev/null; then
-        log_error "Python 3 is required but not installed"
-        log_info "Install Python 3.8+ and try again"
-        exit 1
+# Function to check Python version
+check_python_version() {
+    if ! command_exists python3; then
+        print_error "Python 3 is not installed"
+        return 1
     fi
     
-    python_version=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+    local python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    local required_version=$PYTHON_MIN_VERSION
     
-    if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
-        log_error "Python 3.8+ is required, found $python_version"
-        log_info "Please upgrade Python and try again"
-        exit 1
-    fi
-    
-    log_success "Python $python_version found"
-    
-    # Check pip
-    if ! command -v pip3 &> /dev/null && ! command -v pip &> /dev/null; then
-        log_error "pip is required but not installed"
-        log_info "Install pip and try again"
-        exit 1
-    fi
-    
-    # Check git
-    if ! command -v git &> /dev/null; then
-        log_error "git is required but not installed"
-        log_info "Install git and try again"
-        exit 1
-    fi
-    
-    log_success "All requirements satisfied"
-}
-
-# Install from source
-install_from_source() {
-    log_step "Installing VigileGuard from source..."
-    
-    # Create installation directory
-    mkdir -p "$INSTALL_DIR"
-    
-    # Clone repository
-    log_info "Cloning VigileGuard repository..."
-    if [ -d "$INSTALL_DIR/.git" ]; then
-        cd "$INSTALL_DIR"
-        git pull origin main
-        log_info "Updated existing installation"
-    else
-        git clone "$REPO_URL" "$INSTALL_DIR"
-        cd "$INSTALL_DIR"
-        log_success "Repository cloned successfully"
-    fi
-    
-    # Install dependencies
-    log_info "Installing Python dependencies..."
-    if command -v pip3 &> /dev/null; then
-        PIP_CMD="pip3"
-    else
-        PIP_CMD="pip"
-    fi
-    
-    if [[ $EUID -eq 0 ]]; then
-        $PIP_CMD install -r requirements.txt
-    else
-        $PIP_CMD install --user -r requirements.txt
-    fi
-    
-    log_success "Dependencies installed"
-}
-
-# Create executable script
-create_executable() {
-    log_step "Creating executable scripts..."
-    
-    # Create bin directory if it doesn't exist
-    mkdir -p "$BIN_DIR"
-    
-    # Create vigileguard executable
-    cat > "$BIN_DIR/vigileguard" << EOF
-#!/bin/bash
-# VigileGuard launcher script
-cd "$INSTALL_DIR"
-python3 vigileguard.py "\$@"
-EOF
-    
-    chmod +x "$BIN_DIR/vigileguard"
-    
-    # Create short alias
-    cat > "$BIN_DIR/vg" << EOF
-#!/bin/bash
-# VigileGuard short alias
-cd "$INSTALL_DIR"
-python3 vigileguard.py "\$@"
-EOF
-    
-    chmod +x "$BIN_DIR/vg"
-    
-    log_success "Executable scripts created"
-    log_info "  vigileguard - Full command"
-    log_info "  vg          - Short alias"
-}
-
-# Install configuration
-install_config() {
-    log_step "Installing default configuration..."
-    
-    mkdir -p "$CONFIG_DIR"
-    
-    # Copy default config if it doesn't exist
-    if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
-        cp "$INSTALL_DIR/config.yaml" "$CONFIG_DIR/config.yaml"
-        log_success "Default configuration installed at $CONFIG_DIR/config.yaml"
-    else
-        log_info "Configuration already exists at $CONFIG_DIR/config.yaml"
-        # Backup and update
-        cp "$CONFIG_DIR/config.yaml" "$CONFIG_DIR/config.yaml.backup"
-        cp "$INSTALL_DIR/config.yaml" "$CONFIG_DIR/config.yaml.new"
-        log_info "New config available at $CONFIG_DIR/config.yaml.new"
-    fi
-}
-
-# Add to PATH
-update_path() {
-    log_step "Updating PATH..."
-    
-    if [[ $EUID -ne 0 ]]; then
-        # Add to user PATH
-        SHELL_RC=""
-        if [ -f "$HOME/.bashrc" ]; then
-            SHELL_RC="$HOME/.bashrc"
-        elif [ -f "$HOME/.zshrc" ]; then
-            SHELL_RC="$HOME/.zshrc"
-        elif [ -f "$HOME/.profile" ]; then
-            SHELL_RC="$HOME/.profile"
-        fi
-        
-        if [ -n "$SHELL_RC" ]; then
-            if ! grep -q "$BIN_DIR" "$SHELL_RC"; then
-                echo "" >> "$SHELL_RC"
-                echo "# VigileGuard PATH" >> "$SHELL_RC"
-                echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$SHELL_RC"
-                log_success "Added $BIN_DIR to PATH in $SHELL_RC"
-                log_warn "Please run: source $SHELL_RC or restart your terminal"
-            else
-                log_info "PATH already updated"
-            fi
-        fi
-    fi
-}
-
-# Create systemd service (optional)
-create_service() {
-    if [[ $EUID -eq 0 ]] && command -v systemctl &> /dev/null; then
-        log_step "Creating systemd service (optional)..."
-        
-        cat > /etc/systemd/system/vigileguard-scan.service << EOF
-[Unit]
-Description=VigileGuard Security Scan
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=$BIN_DIR/vigileguard --format json --output /var/log/vigileguard-scan.json
-User=root
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-        cat > /etc/systemd/system/vigileguard-scan.timer << EOF
-[Unit]
-Description=Run VigileGuard Security Scan Daily
-Requires=vigileguard-scan.service
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-        systemctl daemon-reload
-        log_success "Systemd service created"
-        log_info "  Start: systemctl start vigileguard-scan"
-        log_info "  Enable daily scans: systemctl enable --now vigileguard-scan.timer"
-    fi
-}
-
-# Verify installation
-verify_installation() {
-    log_step "Verifying installation..."
-    
-    # Check if vigileguard command works
-    if command -v vigileguard &> /dev/null; then
-        version=$(vigileguard --version 2>/dev/null || echo "1.0.0")
-        log_success "VigileGuard installed successfully: $version"
-        
-        # Test basic functionality
-        log_info "Running basic functionality test..."
-        if vigileguard --help &> /dev/null; then
-            log_success "Basic functionality test passed"
-        else
-            log_warn "Basic functionality test failed"
-        fi
-        
+    if python3 -c "import sys; exit(0 if sys.version_info >= tuple(map(int, '$required_version'.split('.'))) else 1)"; then
+        print_success "Python $python_version detected (>= $required_version required)"
         return 0
     else
-        log_error "VigileGuard command not found in PATH"
-        log_info "Try running: $BIN_DIR/vigileguard --help"
+        print_error "Python $python_version detected, but >= $required_version is required"
         return 1
     fi
 }
 
-# Show usage information
-show_usage() {
-    echo
-    log_success "🎉 VigileGuard installation completed!"
-    echo
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo
-    echo -e "${GREEN}Usage:${NC}"
-    echo "  vigileguard                    # Run basic security audit"
-    echo "  vigileguard --help             # Show all options"
-    echo "  vigileguard --format json      # Generate JSON report"
-    echo "  vg                             # Short alias"
-    echo
-    echo -e "${GREEN}Configuration:${NC}"
-    echo "  $CONFIG_DIR/config.yaml"
-    echo
-    echo -e "${GREEN}Examples:${NC}"
-    echo "  vigileguard --config $CONFIG_DIR/config.yaml"
-    echo "  vigileguard --format json --output security-report.json"
-    echo "  vigileguard --format console | less"
-    echo
-    echo -e "${GREEN}CI/CD Integration:${NC}"
-    echo "  # Returns exit code 1 if critical/high issues found"
-    echo "  vigileguard && echo 'Security audit passed'"
-    echo
-    echo -e "${GREEN}Documentation:${NC}"
-    echo "  Repository: $REPO_URL"
-    echo "  Issues:     $REPO_URL/issues"
-    echo
-    if [[ $EUID -ne 0 ]]; then
-        echo -e "${YELLOW}Note:${NC} Restart your terminal or run:"
-        echo "  export PATH=\"$BIN_DIR:\$PATH\""
-    fi
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-}
-
-# Cleanup function
-cleanup() {
-    if [ $? -ne 0 ]; then
-        echo
-        log_error "Installation failed"
-        log_info "Manual installation steps:"
-        log_info "1. git clone $REPO_URL"
-        log_info "2. cd VigileGuard"
-        log_info "3. pip install -r requirements.txt"
-        log_info "4. python vigileguard.py --help"
-        echo
-        log_info "For support, create an issue at: $REPO_URL/issues"
-    fi
-}
-
-# Uninstall function
-uninstall() {
-    log_step "Uninstalling VigileGuard..."
+# Function to check system requirements
+check_requirements() {
+    print_status "Checking system requirements..."
     
-    # Remove executables
-    rm -f "$BIN_DIR/vigileguard" "$BIN_DIR/vg"
-    
-    # Remove installation directory
-    if [ -d "$INSTALL_DIR" ]; then
-        rm -rf "$INSTALL_DIR"
-        log_success "Removed installation directory"
-    fi
-    
-    # Remove systemd service
-    if [[ $EUID -eq 0 ]] && [ -f "/etc/systemd/system/vigileguard-scan.service" ]; then
-        systemctl stop vigileguard-scan.timer 2>/dev/null || true
-        systemctl disable vigileguard-scan.timer 2>/dev/null || true
-        rm -f /etc/systemd/system/vigileguard-scan.service
-        rm -f /etc/systemd/system/vigileguard-scan.timer
-        systemctl daemon-reload
-        log_success "Removed systemd service"
-    fi
-    
-    log_warn "Configuration preserved at: $CONFIG_DIR"
-    log_info "To remove config: rm -rf $CONFIG_DIR"
-    log_success "VigileGuard uninstalled successfully"
-}
-
-# Update function
-update() {
-    log_step "Updating VigileGuard..."
-    
-    if [ ! -d "$INSTALL_DIR" ]; then
-        log_error "VigileGuard not found. Run installation first."
+    # Check Python
+    if ! check_python_version; then
+        print_error "Python version check failed"
         exit 1
     fi
     
-    cd "$INSTALL_DIR"
-    git pull origin main
-    
-    # Update dependencies
-    if command -v pip3 &> /dev/null; then
-        PIP_CMD="pip3"
-    else
-        PIP_CMD="pip"
+    # Check pip
+    if ! command_exists pip3; then
+        print_error "pip3 is not installed"
+        print_status "Installing pip3..."
+        if command_exists apt-get; then
+            sudo apt-get update && sudo apt-get install -y python3-pip
+        elif command_exists yum; then
+            sudo yum install -y python3-pip
+        elif command_exists pacman; then
+            sudo pacman -S python-pip
+        else
+            print_error "Could not install pip3. Please install it manually."
+            exit 1
+        fi
     fi
     
-    if [[ $EUID -eq 0 ]]; then
-        $PIP_CMD install -r requirements.txt --upgrade
-    else
-        $PIP_CMD install --user -r requirements.txt --upgrade
+    # Check git (optional)
+    if ! command_exists git; then
+        print_warning "Git is not installed. Some features may not work."
     fi
     
-    log_success "VigileGuard updated successfully"
+    print_success "System requirements check passed"
+}
+
+# Function to show usage
+show_usage() {
+    cat << EOF
+🛡️ $SCRIPT_NAME v$VERSION
+
+Usage: $0 [OPTIONS]
+
+Installation Options:
+  --user              Install for current user only (default)
+  --system            Install system-wide (requires sudo)
+  --venv DIR          Create virtual environment in DIR
+  --install-dir DIR   Custom installation directory
+
+Features:
+  --notifications     Enable notification dependencies
+  --setup-cron        Setup scheduled security scans
+  --dev               Install development dependencies
+
+General Options:
+  --help             Show this help message
+  --version          Show version information
+  --check-only       Only check requirements, don't install
+
+Examples:
+  $0                           # Basic user installation
+  $0 --venv ./venv             # Install in virtual environment
+  $0 --system --notifications  # System-wide with notifications
+  $0 --dev                     # Development installation
+
+Repository: $REPO_URL
+EOF
+}
+
+# Function to create virtual environment
+create_virtual_environment() {
+    local venv_dir="$1"
+    
+    print_status "Creating virtual environment in $venv_dir..."
+    
+    python3 -m venv "$venv_dir"
+    
+    # Activate virtual environment
+    source "$venv_dir/bin/activate"
+    
+    # Upgrade pip in venv
+    pip install --upgrade pip
+    
+    print_success "Virtual environment created and activated"
+}
+
+# Function to install VigileGuard
+install_vigileguard() {
+    print_status "Installing VigileGuard..."
+    
+    local pip_cmd="pip3"
+    local install_args=""
+    
+    # Set installation arguments based on type
+    case $INSTALL_TYPE in
+        "user")
+            install_args="--user"
+            ;;
+        "system")
+            if [[ $EUID -ne 0 ]]; then
+                print_error "System installation requires root privileges"
+                print_status "Please run with sudo or use --user option"
+                exit 1
+            fi
+            ;;
+        "venv")
+            pip_cmd="pip"  # Use pip from virtual environment
+            ;;
+    esac
+    
+    # Install base package
+    if [[ -f "setup.py" ]] && [[ -f "vigileguard/__init__.py" ]]; then
+        # Install from source (development)
+        print_status "Installing from source..."
+        if [[ "$ENABLE_DEV" == "true" ]]; then
+            $pip_cmd install $install_args -e ".[dev,full]"
+        elif [[ "$ENABLE_NOTIFICATIONS" == "true" ]]; then
+            $pip_cmd install $install_args -e ".[notifications]"
+        else
+            $pip_cmd install $install_args -e .
+        fi
+    else
+        # Install from PyPI
+        print_status "Installing from PyPI..."
+        if [[ "$ENABLE_DEV" == "true" ]]; then
+            $pip_cmd install $install_args "vigileguard[dev,full]"
+        elif [[ "$ENABLE_NOTIFICATIONS" == "true" ]]; then
+            $pip_cmd install $install_args "vigileguard[notifications]"
+        else
+            $pip_cmd install $install_args vigileguard
+        fi
+    fi
+    
+    print_success "VigileGuard installation completed"
+}
+
+# Function to verify installation
+verify_installation() {
+    print_status "Verifying installation..."
+    
+    # Check if vigileguard command is available
+    if command_exists vigileguard; then
+        local version=$(vigileguard --version 2>/dev/null || echo "unknown")
+        print_success "VigileGuard command available: $version"
+    else
+        print_warning "VigileGuard command not found in PATH"
+        print_status "You may need to add ~/.local/bin to your PATH"
+    fi
+    
+    # Test Python import
+    if python3 -c "import vigileguard; print(f'✅ VigileGuard {vigileguard.__version__} imported successfully')" 2>/dev/null; then
+        print_success "Python import test passed"
+    else
+        print_error "Python import test failed"
+        return 1
+    fi
+    
+    # Check Phase 2 availability
+    if python3 -c "import vigileguard; print('✅ Phase 2 Available' if vigileguard.PHASE2_AVAILABLE else '⚠️ Phase 1 Only')" 2>/dev/null; then
+        print_success "Phase detection test passed"
+    else
+        print_warning "Could not detect available phases"
+    fi
+}
+
+# Function to setup configuration
+setup_configuration() {
+    print_status "Setting up configuration..."
+    
+    local config_dir="$HOME/.config/vigileguard"
+    mkdir -p "$config_dir"
+    
+    # Create sample configuration
+    cat > "$config_dir/config.yaml" << EOF
+# VigileGuard Configuration File
+vigileguard:
+  # Output settings
+  output:
+    directory: "./reports"
+    timestamp_format: "%Y%m%d_%H%M%S"
+    
+  # Security check settings  
+  checks:
+    file_permissions: true
+    user_accounts: true
+    ssh_configuration: true
+    web_security: true
+    network_security: true
+    
+  # Reporting settings
+  reports:
+    include_compliance: true
+    severity_threshold: "INFO"
+    max_findings_per_category: 100
+    
+  # Phase 2 settings
+  phase2:
+    enabled: true
+    web_security_deep_scan: true
+    network_port_scan: true
+    enhanced_html_reports: true
+    
+  # Notification settings (disabled by default)
+  notifications:
+    enabled: false
+    email:
+      enabled: false
+      smtp_server: ""
+      smtp_port: 587
+      username: ""
+      password: ""
+      recipients: []
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#security"
+    webhook:
+      enabled: false
+      url: ""
+EOF
+    
+    print_success "Configuration created at $config_dir/config.yaml"
+}
+
+# Function to setup cron jobs
+setup_cron_jobs() {
+    if [[ "$SETUP_CRON" != "true" ]]; then
+        return
+    fi
+    
+    print_status "Setting up scheduled scans..."
+    
+    # Create cron script
+    local cron_script="/usr/local/bin/vigileguard-daily-scan"
+    
+    cat > "$cron_script" << 'EOF'
+#!/bin/bash
+# VigileGuard Daily Security Scan
+
+LOG_DIR="/var/log/vigileguard"
+REPORT_DIR="/var/log/vigileguard/reports"
+DATE=$(date +%Y%m%d)
+
+# Create directories
+mkdir -p "$LOG_DIR" "$REPORT_DIR"
+
+# Run scan
+vigileguard --format json --output "$REPORT_DIR/daily-scan-$DATE.json" \
+    >> "$LOG_DIR/vigileguard.log" 2>&1
+
+# Clean old reports (keep 30 days)
+find "$REPORT_DIR" -name "daily-scan-*.json" -mtime +30 -delete
+
+# Send notifications for critical findings (if configured)
+if command -v vigileguard-notify >/dev/null 2>&1; then
+    vigileguard-notify "$REPORT_DIR/daily-scan-$DATE.json"
+fi
+EOF
+    
+    chmod +x "$cron_script"
+    
+    # Add to crontab (run daily at 2 AM)
+    (crontab -l 2>/dev/null; echo "0 2 * * * $cron_script") | crontab -
+    
+    print_success "Daily security scan scheduled for 2:00 AM"
+}
+
+# Function to show post-installation instructions
+show_post_install() {
+    print_success "🛡️ VigileGuard Installation Complete!"
+    echo ""
+    echo "Quick Start Commands:"
+    echo "  vigileguard --help                    # Show help"
+    echo "  vigileguard --format console          # Run basic scan"
+    echo "  vigileguard --format html --output report.html  # Generate HTML report"
+    echo "  vigileguard --format json --output report.json  # Generate JSON report"
+    echo ""
+    
+    if [[ "$INSTALL_TYPE" == "venv" ]]; then
+        echo "Virtual Environment:"
+        echo "  source $INSTALL_DIR/bin/activate     # Activate virtual environment"
+        echo ""
+    fi
+    
+    echo "Configuration:"
+    echo "  ~/.config/vigileguard/config.yaml    # Edit configuration"
+    echo ""
+    
+    echo "Documentation:"
+    echo "  $REPO_URL                             # GitHub repository"
+    echo "  $REPO_URL/blob/main/docs/             # Documentation"
+    echo ""
+    
+    if [[ "$SETUP_CRON" == "true" ]]; then
+        echo "Scheduled Scans:"
+        echo "  Daily scans configured at 2:00 AM"
+        echo "  Reports saved to /var/log/vigileguard/reports/"
+        echo ""
+    fi
+    
+    print_status "Installation completed successfully! 🎉"
 }
 
 # Main installation function
 main() {
-    trap cleanup EXIT
+    echo "🛡️ $SCRIPT_NAME v$VERSION"
+    echo "==============================="
+    echo ""
     
-    show_banner
-    echo "Installing VigileGuard - Your Vigilant Guardian for Linux Security"
-    echo "Repository: $REPO_URL"
-    echo
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                show_usage
+                exit 0
+                ;;
+            --version)
+                echo "$SCRIPT_NAME v$VERSION"
+                exit 0
+                ;;
+            --check-only)
+                check_requirements
+                print_success "Requirements check completed"
+                exit 0
+                ;;
+            --user)
+                INSTALL_TYPE="user"
+                ;;
+            --system)
+                INSTALL_TYPE="system"
+                ;;
+            --venv)
+                INSTALL_TYPE="venv"
+                INSTALL_DIR="$2"
+                CREATE_VENV=true
+                shift
+                ;;
+            --install-dir)
+                INSTALL_DIR="$2"
+                shift
+                ;;
+            --notifications)
+                ENABLE_NOTIFICATIONS=true
+                ;;
+            --setup-cron)
+                SETUP_CRON=true
+                ;;
+            --dev)
+                ENABLE_DEV=true
+                ENABLE_NOTIFICATIONS=true
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
     
-    check_root
-    check_requirements
-    install_from_source
-    create_executable
-    install_config
-    update_path
-    create_service
-    
-    if verify_installation; then
-        show_usage
-    else
-        exit 1
+    # Set default venv directory if not specified
+    if [[ "$CREATE_VENV" == "true" ]] && [[ -z "$INSTALL_DIR" ]]; then
+        INSTALL_DIR="./vigileguard-venv"
     fi
+    
+    # Check requirements
+    check_requirements
+    
+    # Create virtual environment if requested
+    if [[ "$CREATE_VENV" == "true" ]]; then
+        create_virtual_environment "$INSTALL_DIR"
+    fi
+    
+    # Install VigileGuard
+    install_vigileguard
+    
+    # Verify installation
+    verify_installation
+    
+    # Setup configuration
+    setup_configuration
+    
+    # Setup cron jobs if requested
+    setup_cron_jobs
+    
+    # Show post-installation instructions
+    show_post_install
 }
 
-# Handle command line arguments
-case "${1:-}" in
-    --help|-h)
-        show_banner
-        echo "VigileGuard Installation Script"
-        echo "Repository: $REPO_URL"
-        echo
-        echo "Usage: $0 [options]"
-        echo
-        echo "Options:"
-        echo "  --help, -h      Show this help message"
-        echo "  --uninstall     Remove VigileGuard from system"
-        echo "  --update        Update existing installation"
-        echo "  --version       Show version information"
-        echo
-        echo "Installation:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/navinnm/VigileGuard/main/install.sh | bash"
-        echo
-        exit 0
-        ;;
-    --uninstall)
-        show_banner
-        echo "Uninstalling VigileGuard..."
-        echo
-        check_root
-        uninstall
-        ;;
-    --update)
-        show_banner
-        echo "Updating VigileGuard..."
-        echo
-        check_root
-        update
-        ;;
-    --version)
-        echo "VigileGuard Installation Script v1.0.0"
-        echo "Repository: $REPO_URL"
-        exit 0
-        ;;
-    *)
-        main
-        ;;
-esac
+# Run main function
+main "$@"

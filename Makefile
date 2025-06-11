@@ -1,309 +1,246 @@
 # VigileGuard Makefile
-# Repository: https://github.com/navinnm/VigileGuard
-# Development and build automation
+# Provides easy commands for development, testing, and deployment
 
-.PHONY: help install install-dev test lint format clean build deploy docker run-example
+.PHONY: help install install-dev clean test test-all lint format security build package deploy docs run run-phase2 docker
 
 # Default target
 help:
-	@echo "🛡️  VigileGuard Development Makefile"
-	@echo "Repository: https://github.com/navinnm/VigileGuard"
+	@echo "🛡️ VigileGuard Development Commands"
 	@echo "=================================="
 	@echo ""
-	@echo "Available targets:"
-	@echo "  install        Install VigileGuard for production use"
-	@echo "  install-dev    Install VigileGuard for development"
-	@echo "  test           Run test suite"
-	@echo "  lint           Run code linting"
-	@echo "  format         Format code with black"
-	@echo "  clean          Clean build artifacts"
-	@echo "  build          Build distribution packages"
-	@echo "  docker         Build Docker image"
-	@echo "  run-example    Run example security audit"
-	@echo "  docs           Generate documentation"
-	@echo "  setup-dev      Setup complete development environment"
+	@echo "Setup & Installation:"
+	@echo "  install      Install VigileGuard in current environment"
+	@echo "  install-dev  Install VigileGuard with development dependencies"
+	@echo "  clean        Clean build artifacts and cache files"
 	@echo ""
+	@echo "Development:"
+	@echo "  test         Run unit tests"
+	@echo "  test-all     Run all tests including integration tests"
+	@echo "  lint         Run code linting (flake8, mypy)"
+	@echo "  format       Format code with black"
+	@echo "  security     Run security scans (bandit, safety)"
+	@echo ""
+	@echo "Building & Packaging:"
+	@echo "  build        Build source and wheel distributions"
+	@echo "  package      Create distribution packages"
+	@echo "  deploy       Deploy to PyPI (requires credentials)"
+	@echo ""
+	@echo "Running:"
+	@echo "  run          Run VigileGuard Phase 1"
+	@echo "  run-phase2   Run VigileGuard Phase 2"
+	@echo "  run-html     Generate HTML report"
+	@echo "  run-all      Generate all report formats"
+	@echo ""
+	@echo "Docker:"
+	@echo "  docker       Build and run VigileGuard in Docker"
+	@echo "  docker-build Build Docker image"
+	@echo "  docker-run   Run VigileGuard in Docker container"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  docs         Generate documentation"
 
-# Installation targets
+# Variables
+PYTHON := python3
+PIP := pip3
+PACKAGE_NAME := vigileguard
+VERSION := $(shell $(PYTHON) -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "2.0.0")
+
+# Setup & Installation
 install:
 	@echo "📦 Installing VigileGuard..."
-	pip install -r requirements.txt
-	@echo "✅ VigileGuard installed successfully"
-	@echo "Run with: python vigileguard.py --help"
+	$(PIP) install -e .
+	@echo "✅ Installation complete!"
 
 install-dev:
-	@echo "🔧 Installing VigileGuard for development..."
-	pip install -r requirements.txt
-	pip install pytest pytest-cov black flake8 mypy bandit safety
-	@echo "✅ Development environment ready"
+	@echo "📦 Installing VigileGuard with development dependencies..."
+	$(PIP) install -e ".[dev,full]"
+	@echo "✅ Development installation complete!"
 
-# Testing
-test:
-	@echo "🧪 Running test suite..."
-	@if [ -f "test_vigileguard.py" ]; then \
-		python -m pytest test_vigileguard.py -v --cov=. --cov-report=html --cov-report=term; \
-	else \
-		echo "⚠️  test_vigileguard.py not found, running basic tests..."; \
-		python vigileguard.py --help > /dev/null && echo "✅ Basic functionality test passed"; \
-	fi
-
-test-quick:
-	@echo "⚡ Running quick tests..."
-	python vigileguard.py --help > /dev/null && echo "✅ Help command works"
-	python vigileguard.py --version > /dev/null && echo "✅ Version command works"
-	@echo "✅ Quick tests completed"
-
-# Code quality
-lint:
-	@echo "🔍 Running code linting..."
-	@echo "Running flake8..."
-	flake8 vigileguard.py --max-line-length=100 --ignore=E203,W503 || true
-	@echo "Running mypy..."
-	mypy vigileguard.py --ignore-missing-imports || true
-	@echo "Running bandit security check..."
-	bandit -r . -f json || true
-
-# FIXED: Actually format the code (remove --check)
-format:
-	@echo "🎨 Formatting code..."
-	black --line-length=100 vigileguard.py
-	@echo "✅ Code formatted"
-
-# FIXED: Remove duplicate --check
-format-check:
-	@echo "🔍 Checking code format..."
-	black --check --line-length=100 vigileguard.py || (echo "❌ Code is not formatted correctly. Run 'make format' to fix." && exit 1)
-
-# Build and distribution
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
-	rm -rf htmlcov/
 	rm -rf .pytest_cache/
-	rm -rf __pycache__/
+	rm -rf .coverage
+	rm -rf htmlcov/
+	rm -rf .mypy_cache/
+	rm -rf .tox/
+	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*~" -delete
-	@echo "✅ Cleanup completed"
+	@echo "✅ Cleanup complete!"
 
+# Development
+test:
+	@echo "🧪 Running unit tests..."
+	pytest tests/ -v --tb=short
+	@echo "✅ Tests complete!"
+
+test-all:
+	@echo "🧪 Running all tests..."
+	pytest tests/ -v --tb=short --cov=$(PACKAGE_NAME) --cov-report=html --cov-report=term-missing
+	@echo "✅ All tests complete!"
+
+lint:
+	@echo "🔍 Running code linting..."
+	@echo "Running flake8..."
+	flake8 $(PACKAGE_NAME)/ tests/
+	@echo "Running mypy..."
+	mypy $(PACKAGE_NAME)/
+	@echo "✅ Linting complete!"
+
+format:
+	@echo "🎨 Formatting code with black..."
+	black $(PACKAGE_NAME)/ tests/ scripts/
+	@echo "✅ Formatting complete!"
+
+security:
+	@echo "🔒 Running security scans..."
+	@echo "Running bandit..."
+	bandit -r $(PACKAGE_NAME)/ -f json -o bandit-report.json || true
+	@echo "Running safety check..."
+	safety check --json --output safety-report.json || true
+	@echo "✅ Security scans complete!"
+
+# Building & Packaging
 build: clean
-	@echo "📦 Building VigileGuard..."
-	@if [ -f "setup.py" ]; then \
-		python setup.py sdist bdist_wheel; \
-	else \
-		echo "⚠️  setup.py not found, creating simple archive..."; \
-		tar -czf vigileguard-$(shell date +%Y%m%d).tar.gz *.py *.yaml *.txt *.md *.sh Dockerfile; \
-	fi
-	@echo "✅ Build completed"
+	@echo "🏗️ Building distribution packages..."
+	$(PYTHON) -m build
+	@echo "✅ Build complete!"
+
+package: build
+	@echo "📦 Creating distribution packages..."
+	@echo "Package version: $(VERSION)"
+	@echo "Source distribution: dist/$(PACKAGE_NAME)-$(VERSION).tar.gz"
+	@echo "Wheel distribution: dist/$(PACKAGE_NAME)-$(VERSION)-py3-none-any.whl"
+	@echo "✅ Packaging complete!"
+
+deploy: package
+	@echo "🚀 Deploying to PyPI..."
+	@echo "⚠️  Make sure you have proper credentials configured!"
+	@read -p "Deploy to PyPI? [y/N] " confirm && [ "$$confirm" = "y" ]
+	twine upload dist/*
+	@echo "✅ Deployment complete!"
+
+# Running
+run:
+	@echo "🛡️ Running VigileGuard Phase 1..."
+	$(PYTHON) -m $(PACKAGE_NAME).vigileguard --format console
+
+run-phase2:
+	@echo "🛡️ Running VigileGuard Phase 2..."
+	$(PYTHON) -m $(PACKAGE_NAME).phase2_integration --format console
+
+run-html:
+	@echo "🛡️ Generating HTML report..."
+	mkdir -p reports
+	$(PYTHON) -m $(PACKAGE_NAME).vigileguard --format html --output reports/vigileguard-report.html
+	@echo "✅ HTML report generated: reports/vigileguard-report.html"
+
+run-json:
+	@echo "🛡️ Generating JSON report..."
+	mkdir -p reports
+	$(PYTHON) -m $(PACKAGE_NAME).vigileguard --format json --output reports/vigileguard-report.json
+	@echo "✅ JSON report generated: reports/vigileguard-report.json"
+
+run-all:
+	@echo "🛡️ Generating all report formats..."
+	mkdir -p reports
+	$(PYTHON) -m $(PACKAGE_NAME).vigileguard --format all --output reports/
+	@echo "✅ All reports generated in reports/ directory"
 
 # Docker
-docker:
+docker: docker-build docker-run
+
+docker-build:
 	@echo "🐳 Building Docker image..."
-	docker build -t vigileguard:latest .
-	@echo "✅ Docker image built: vigileguard:latest"
+	docker build -t $(PACKAGE_NAME):latest .
+	docker build -t $(PACKAGE_NAME):$(VERSION) .
+	@echo "✅ Docker image built!"
 
 docker-run:
 	@echo "🐳 Running VigileGuard in Docker..."
-	docker run --rm vigileguard:latest
+	docker run --rm -v $(PWD)/reports:/app/reports $(PACKAGE_NAME):latest --format html --output /app/reports/docker-report.html
+	@echo "✅ Docker run complete!"
 
-docker-test:
-	@echo "🐳 Testing Docker image..."
-	docker run --rm vigileguard:latest --help
+docker-shell:
+	@echo "🐳 Opening shell in VigileGuard container..."
+	docker run --rm -it -v $(PWD)/reports:/app/reports $(PACKAGE_NAME):latest /bin/bash
 
 # Documentation
 docs:
 	@echo "📚 Generating documentation..."
-	@mkdir -p docs/
-	@echo "# VigileGuard API Documentation" > docs/api.md
-	@echo "" >> docs/api.md
-	@echo "Generated on: $(shell date)" >> docs/api.md
-	@echo "" >> docs/api.md
-	@python -c "import vigileguard; help(vigileguard)" >> docs/api.txt 2>/dev/null || echo "Could not generate API docs"
-	@echo "✅ Documentation generated in docs/"
+	@echo "TODO: Add documentation generation (Sphinx, MkDocs, etc.)"
+	@echo "For now, see README.md and docs/ directory"
 
-# Examples and testing
-run-example:
-	@echo "🛡️  Running VigileGuard example..."
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	python vigileguard.py --help
-	@echo ""
-	@echo "🔍 Running basic security audit (demo mode)..."
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Utility targets
+check-deps:
+	@echo "🔍 Checking dependencies..."
+	$(PIP) check
+	@echo "✅ Dependencies OK!"
 
-run-json:
-	@echo "📊 Generating JSON report..."
-	python vigileguard.py --format json --output vigileguard-report.json || true
-	@echo "✅ Report saved to vigileguard-report.json"
+version:
+	@echo "VigileGuard version: $(VERSION)"
 
-run-config:
-	@echo "⚙️  Running with custom configuration..."
-	python vigileguard.py --config config.yaml --format console
-
-# Development helpers
-setup-dev:
-	@echo "🚀 Setting up complete development environment..."
-	@if [ ! -d "venv" ]; then \
-		echo "Creating virtual environment..."; \
-		python3 -m venv venv; \
-	fi
-	@echo "Installing dependencies..."
-	. venv/bin/activate && pip install --upgrade pip
-	. venv/bin/activate && make install-dev
-	@echo ""
-	@echo "✅ Development environment ready!"
-	@echo ""
-	@echo "🎯 Next steps:"
-	@echo "  source venv/bin/activate    # Activate virtual environment"
-	@echo "  make test                   # Run tests"
-	@echo "  make run-example           # Test VigileGuard"
-	@echo "  make format                # Format code"
-
-check-security:
-	@echo "🔒 Running security checks on codebase..."
-	@echo "Running bandit..."
-	bandit -r . -f json -o security-report.json || true
-	@echo "Running safety check..."
-	safety check || true
-	@echo "✅ Security checks completed"
-
-# Performance testing
-performance-test:
-	@echo "⚡ Running performance tests..."
-	@echo "Testing execution time..."
-	time python vigileguard.py --format json > /dev/null || true
-	@echo "✅ Performance test completed"
-
-# Release preparation
-prepare-release:
-	@echo "🚀 Preparing release..."
-	make clean
-	make format-check
-	make lint
-	make test
-	make build
-	@echo "✅ Release preparation complete!"
-
-# CI/CD simulation
-ci-test:
-	@echo "🔄 Simulating CI/CD pipeline..."
-	@echo "Step 1: Format check..."
-	make format-check
-	@echo "Step 2: Linting..."
-	make lint
-	@echo "Step 3: Testing..."
-	make test
-	@echo "Step 4: Building..."
-	make build
-	@echo "✅ CI/CD simulation complete!"
-
-# Installation verification
-verify-install:
-	@echo "✅ Verifying installation..."
-	@which python3 > /dev/null && echo "✅ Python 3 found" || echo "❌ Python 3 not found"
-	@python3 --version | grep -E "3\.[8-9]|3\.1[0-9]" > /dev/null && echo "✅ Python version OK" || echo "⚠️  Python 3.8+ recommended"
-	@pip --version > /dev/null && echo "✅ pip available" || echo "❌ pip not found"
-	@git --version > /dev/null && echo "✅ git available" || echo "❌ git not found"
-	@python vigileguard.py --help > /dev/null && echo "✅ VigileGuard works" || echo "❌ VigileGuard not working"
-
-# System requirements check
-check-requirements:
-	@echo "🔍 Checking system requirements..."
-	@python3 --version | grep -E "3\.[8-9]|3\.1[0-9]" > /dev/null && echo "✅ Python version OK" || echo "❌ Python 3.8+ required"
-	@pip --version > /dev/null && echo "✅ pip available" || echo "❌ pip not found"
-	@git --version > /dev/null && echo "✅ git available" || echo "❌ git not found"
-	@command -v make > /dev/null && echo "✅ make available" || echo "⚠️  make not found"
-
-# Package information
 info:
-	@echo "📋 VigileGuard Package Information"
-	@echo "=================================="
-	@echo "Name: VigileGuard"
-	@echo "Version: 1.0.0"
-	@echo "Description: Linux Security Audit Tool"
-	@echo "Repository: https://github.com/navinnm/VigileGuard"
-	@echo "Python: 3.8+"
-	@echo "License: MIT"
+	@echo "🛡️ VigileGuard Project Information"
+	@echo "================================"
+	@echo "Package: $(PACKAGE_NAME)"
+	@echo "Version: $(VERSION)"
+	@echo "Python: $(shell $(PYTHON) --version)"
+	@echo "Pip: $(shell $(PIP) --version)"
+	@echo "Current directory: $(PWD)"
 	@echo ""
-	@echo "📦 Dependencies:"
-	@cat requirements.txt
-	@echo ""
-	@echo "📁 Files:"
-	@ls -la *.py *.yaml *.txt *.md *.sh 2>/dev/null || echo "Core files present"
+	@echo "Files in current directory:"
+	@ls -la
 
-# Cleanup targets
-clean-cache:
-	@echo "🧹 Cleaning Python cache..."
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+# Development workflow shortcuts
+dev-setup: install-dev
+	@echo "🔧 Development environment setup complete!"
+	@echo "You can now run: make test, make lint, make run"
 
-clean-docs:
-	@echo "🧹 Cleaning documentation..."
-	rm -rf docs/ 2>/dev/null || true
+dev-check: format lint test security
+	@echo "✅ All development checks passed!"
 
-clean-all: clean clean-cache clean-docs
-	@echo "✅ Complete cleanup finished"
+release-check: dev-check build
+	@echo "✅ Release checks passed! Ready to deploy."
 
-# Development workflow targets
-dev-start: setup-dev
-	@echo "🚀 Development session ready!"
-	@echo "Remember to activate virtual environment: source venv/bin/activate"
+# Continuous Integration shortcuts
+ci: clean install-dev test-all lint security
+	@echo "✅ CI pipeline complete!"
 
-dev-test: format lint test
-	@echo "✅ Development testing complete"
-
-dev-commit: format lint test
-	@echo "✅ Code ready for commit"
-
-# Quick development commands - FIXED
-quick-format:
-	@echo "⚡ Quick format..."
-	black --line-length=100 vigileguard.py
-
+# Quick commands for common tasks
 quick-test:
-	@echo "⚡ Quick test..."
-	python vigileguard.py --help > /dev/null && echo "✅ Works" || echo "❌ Failed"
+	@pytest tests/ -x -v
 
-quick-run:
-	@echo "⚡ Quick run..."
-	python vigileguard.py --help
+quick-scan:
+	@$(PYTHON) -m $(PACKAGE_NAME).vigileguard --format console | head -20
 
-# Installation using script
-install-script:
-	@echo "📥 Installing using install.sh script..."
-	@if [ -f "install.sh" ]; then \
-		chmod +x install.sh && ./install.sh; \
-	else \
-		echo "❌ install.sh not found"; \
-	fi
-
-# Uninstall using script
-uninstall-script:
-	@echo "🗑️  Uninstalling using install.sh script..."
-	@if [ -f "install.sh" ]; then \
-		chmod +x install.sh && ./install.sh --uninstall; \
-	else \
-		echo "❌ install.sh not found"; \
-	fi
-
-# Update using script
-update-script:
-	@echo "🔄 Updating using install.sh script..."
-	@if [ -f "install.sh" ]; then \
-		chmod +x install.sh && ./install.sh --update; \
-	else \
-		echo "❌ install.sh not found"; \
-	fi
-
-# Show all available targets
-targets:
-	@echo "📋 All available Makefile targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+# Help for specific targets
+help-install:
+	@echo "Installation Help:"
+	@echo "=================="
 	@echo ""
-	@echo "🎯 Common workflows:"
-	@echo "  make setup-dev             # Setup development environment"
-	@echo "  make dev-test              # Full development testing"
-	@echo "  make run-example           # Test the tool"
-	@echo "  make ci-test               # Simulate CI/CD"
-	@echo "  make docker                # Build Docker image"
+	@echo "make install      - Install VigileGuard in current environment"
+	@echo "make install-dev  - Install with development dependencies"
+	@echo ""
+	@echo "For system-wide installation:"
+	@echo "  sudo make install"
+	@echo ""
+	@echo "For virtual environment:"
+	@echo "  python -m venv venv"
+	@echo "  source venv/bin/activate"
+	@echo "  make install"
+
+help-docker:
+	@echo "Docker Help:"
+	@echo "============"
+	@echo ""
+	@echo "make docker-build - Build VigileGuard Docker image"
+	@echo "make docker-run   - Run VigileGuard in container"
+	@echo "make docker-shell - Open interactive shell in container"
+	@echo ""
+	@echo "Manual Docker commands:"
+	@echo "  docker run --rm vigileguard:latest --help"
+	@echo "  docker run --rm -v \$(pwd)/reports:/app/reports vigileguard:latest --format html"

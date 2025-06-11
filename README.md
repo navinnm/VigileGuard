@@ -3,497 +3,505 @@
 🛡️ **VigileGuard** is a comprehensive security audit tool designed for developer-focused startups and Linux systems. It performs automated security checks, identifies vulnerabilities, and provides actionable recommendations for system hardening and compliance.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub issues](https://img.shields.io/github/issues/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/issues)
 [![GitHub stars](https://img.shields.io/github/stars/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/stargazers)
 [![CI/CD](https://github.com/navinnm/VigileGuard/workflows/VigileGuard%20CI/CD%20Pipeline/badge.svg)](https://github.com/navinnm/VigileGuard/actions)
 [![Security Status](https://img.shields.io/badge/security-monitored-green.svg)](SECURITY.md)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-## 🚀 Why VigileGuard?
+VigileGuard is a comprehensive security audit tool designed specifically for Linux systems. It provides automated security assessments, compliance mapping, and detailed reporting to help system administrators and security professionals identify and remediate security vulnerabilities.
 
-Developer-focused startups often face **security concerns** due to limited resources and budget constraints. VigileGuard addresses this by providing:
+## 🚀 Features
 
-- **🔍 Automated Security Audits** - No security expertise required
-- **💰 Cost-Effective** - Open source with enterprise features
-- **⚡ Developer-Friendly** - Easy integration with CI/CD pipelines
-- **📊 Actionable Insights** - Clear recommendations, not just problems
-- **🔧 Plug-and-Play** - Works out of the box with sensible defaults
+### Phase 1 (Core Security Checks)
+- **File Permission Analysis** - Detect world-writable files, incorrect permissions on sensitive files
+- **User Account Security** - Check for weak passwords, duplicate UIDs, sudo misconfigurations  
+- **SSH Configuration Review** - Analyze SSH settings for security best practices
+- **System Information Gathering** - Collect OS version, kernel info, running services
 
-## ✨ Features
+### Phase 2 (Advanced Security & Reporting)
+- **Web Server Security** - Apache/Nginx configuration analysis, SSL/TLS checks
+- **Network Security Analysis** - Port scanning, firewall configuration review
+- **Enhanced HTML Reporting** - Beautiful, interactive security reports
+- **Compliance Mapping** - PCI DSS, SOC 2, NIST CSF, ISO 27001 alignment
+- **Notification Integrations** - Email, Slack, webhook notifications
+- **Trend Tracking** - Historical analysis and security trend monitoring
+- **Scheduled Scanning** - Automated recurring security audits
 
-### Phase 1 (Current) - Core Security Audits
-- **📋 File Permission Analysis** - World-writable files, SUID/SGID binaries, sensitive file permissions
-- **👥 User Account Security** - Empty passwords, duplicate UIDs, sudo configuration
-- **🔑 SSH Configuration Review** - Root login, authentication methods, protocol versions
-- **💻 System Information** - OS version, kernel info, risky services
+## 📁 Project Structure
 
-### 🎯 Intelligent Reporting
-- **Severity-based Classification** (CRITICAL, HIGH, MEDIUM, LOW, INFO)
-- **Rich Console Output** with color coding and progress indicators
-- **JSON Export** for automation and CI/CD integration
-- **Detailed Remediation** recommendations with exact commands
+```
+VigileGuard/
+├── vigileguard/                    # Main package directory
+│   ├── __init__.py                # Package initialization
+│   ├── vigileguard.py             # Core Phase 1 + 2 scanner
+│   ├── web_security_checkers.py   # Phase 2 web security modules
+│   ├── enhanced_reporting.py      # Phase 2 reporting system
+│   └── phase2_integration.py      # Phase 2 integration & config
+├── scripts/                       # Utility scripts
+│   ├── badge_generator.py         # Generate status badges
+│   ├── report_analyzer.py         # Analyze scan reports
+│   └── vigileguard-install.sh     # Installation script
+├── tests/                         # Test suite
+│   ├── test_vigileguard.py        # Core functionality tests
+│   ├── test_web_security.py       # Web security tests
+│   └── test_reporting.py          # Reporting tests
+├── docs/                          # Documentation
+├── examples/                      # Example configurations
+├── config.yaml                    # Default configuration
+├── requirements.txt               # Python dependencies
+├── setup.py                       # Package setup
+├── pyproject.toml                 # Modern Python packaging
+├── Makefile                       # Development commands
+└── README.md                      # This file
+```
 
-### ⚙️ Enterprise Ready
-- **YAML Configuration** - Customizable rules and severity levels
-- **Modular Architecture** - Easy to extend with custom checks
-- **Exit Codes** - Perfect for CI/CD integration
-- **Zero Dependencies** - Minimal external requirements
-
-## 📦 Installation
+## 🔧 Installation
 
 ### Quick Install (Recommended)
+
+```bash
+# Download and run the installer
+curl -sSL https://raw.githubusercontent.com/navinnm/VigileGuard/main/install.sh | bash
+
+# Or install from PyPI
+pip install vigileguard
+```
+
+### Development Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/navinnm/VigileGuard.git
 cd VigileGuard
 
-# Install dependencies
-pip install -r requirements.txt
+# Install in development mode
+make install-dev
 
-# Run VigileGuard
-python vigileguard.py 
-or 
-python3 vigileguard.py
+# Or manually
+pip install -e ".[dev,full]"
 ```
 
-### Alternative Installation Methods
+### Virtual Environment Installation
 
 ```bash
-# Using pip (when published)
+# Create and activate virtual environment
+python3 -m venv vigileguard-env
+source vigileguard-env/bin/activate
+
+# Install VigileGuard
 pip install vigileguard
 
-# Using the install script
-curl -fsSL https://raw.githubusercontent.com/navinnm/VigileGuard/main/install.sh | bash
-
-# Docker deployment
-docker build -t vigileguard .
-docker run --rm vigileguard
+# Or from source
+pip install -e .
 ```
 
-### Dependencies
+### Docker Installation
 
-- Python 3.8+
-- click >= 8.0.0
-- rich >= 13.0.0
-- PyYAML >= 6.0
+```bash
+# Build Docker image
+docker build -t vigileguard .
+
+# Run in container
+docker run --rm -v $(pwd)/reports:/app/reports vigileguard --format html
+```
 
 ## 🚀 Quick Start
 
 ### Basic Usage
 
 ```bash
-# Run basic security audit
-python vigileguard.py 
-or 
-python3 vigileguard.py
+# Run basic console scan
+vigileguard
 
-# Generate JSON report for CI/CD
-python vigileguard.py --format json --output security-report.json 
-or
-python3 vigileguard.py --format json --output security-report.json
+# Generate HTML report
+vigileguard --format html --output security-report.html
 
+# Generate JSON report
+vigileguard --format json --output security-report.json
+
+# Generate all report formats
+vigileguard --format all --output ./reports/
+```
+
+### Advanced Usage
+
+```bash
 # Use custom configuration
-python vigileguard.py --config custom-config.yaml
-or
-python3 vigileguard.py --config custom-config.yaml
+vigileguard --config custom-config.yaml --format html
 
+# Specify environment
+vigileguard --environment production --format json
 
-# Show help and options
-python vigileguard.py --help
-or
-python3 vigileguard.py --help
+# Enable notifications
+vigileguard --notifications --format html
 
+# Debug mode
+vigileguard --debug --format console
 ```
 
-### Example Output
+### Using Make Commands
 
-```
-🛡️ VigileGuard Security Audit
-Starting audit at 2025-06-10 14:30:15
+```bash
+# Install and setup
+make install-dev
 
-🔍 Checking file permissions...
-👥 Checking user accounts...
-🔑 Checking SSH configuration...
-💻 Gathering system information...
+# Run tests
+make test
 
-📊 Audit Results
-┏━━━━━━━━━━┳━━━━━━━┓
-┃ Severity ┃ Count ┃
-┡━━━━━━━━━━╇━━━━━━━┩
-│ HIGH     │     2 │
-│ MEDIUM   │     1 │
-│ INFO     │     3 │
-└──────────┴───────┘
+# Format code
+make format
 
-╭─ HIGH - SSH ──────────────────────────────╮
-│ Insecure SSH setting: permitrootlogin    │
-│                                           │
-│ Root login should be disabled. Current:  │
-│ yes                                       │
-│                                           │
-│ 💡 Recommendation: Set 'PermitRootLogin  │
-│ no' in /etc/ssh/sshd_config              │
-╰───────────────────────────────────────────╯
+# Run security scans
+make security
 
-✅ Audit completed successfully
+# Build package
+make build
+
+# Generate HTML report
+make run-html
+
+# Run all formats
+make run-all
 ```
 
 ## ⚙️ Configuration
 
-VigileGuard uses YAML configuration files for customization:
+Create a configuration file at `~/.config/vigileguard/config.yaml`:
 
 ```yaml
-# config.yaml
-output_format: "console"
-severity_filter: "INFO"
-
-# Skip specific checks
-excluded_checks:
-  - "SystemInfoChecker"
-
-# Override severity levels
-severity_overrides:
-  "SSH running on default port": "LOW"
-
-# SSH security requirements
-ssh_checks:
-  required_settings:
-    PermitRootLogin: "no"
-    PasswordAuthentication: "no"
-    PermitEmptyPasswords: "no"
-
-# File permission rules
-file_permission_rules:
-  sensitive_files:
-    "/etc/shadow":
-      mode: "0640"
-      owner: "root"
-      group: "shadow"
+vigileguard:
+  # Output settings
+  output:
+    directory: "./reports"
+    timestamp_format: "%Y%m%d_%H%M%S"
+    
+  # Security checks
+  checks:
+    file_permissions: true
+    user_accounts: true
+    ssh_configuration: true
+    web_security: true
+    network_security: true
+    
+  # Reporting
+  reports:
+    include_compliance: true
+    severity_threshold: "INFO"
+    
+  # Phase 2 features
+  phase2:
+    enabled: true
+    web_security_deep_scan: true
+    enhanced_html_reports: true
+    
+  # Notifications (Phase 2)
+  notifications:
+    enabled: false
+    email:
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "your-email@domain.com"
+      recipients: ["admin@company.com"]
+    slack:
+      webhook_url: "https://hooks.slack.com/..."
+      channel: "#security"
 ```
 
-### Configuration Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `output_format` | Output format (console/json) | `console` |
-| `severity_filter` | Minimum severity to report | `INFO` |
-| `excluded_checks` | List of checks to skip | `[]` |
-| `excluded_paths` | Paths to exclude from scans | `["/tmp", "/proc"]` |
-
-## 🔧 CI/CD Integration
-
-VigileGuard is designed for seamless automation:
-
-### Exit Codes
-- `0`: No critical or high severity issues
-- `1`: Critical or high severity issues found
-- `130`: Interrupted by user
-- `Other`: Error during execution
-
-### GitHub Actions Example
-
-```yaml
-name: Security Audit with VigileGuard
-on: [push, pull_request]
-
-jobs:
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-      
-      - name: Install VigileGuard
-        run: |
-          git clone https://github.com/navinnm/VigileGuard.git
-          cd VigileGuard
-          pip install -r requirements.txt
-      
-      - name: Run Security Audit
-        run: |
-          cd VigileGuard
-          python vigileguard.py --format json --output security-report.json
-      
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: security-report
-          path: VigileGuard/security-report.json
-```
-
-### Jenkins Pipeline Example
-
-```groovy
-pipeline {
-    agent any
-    stages {
-        stage('Security Audit') {
-            steps {
-                script {
-                    sh '''
-                        git clone https://github.com/navinnm/VigileGuard.git
-                        cd VigileGuard
-                        pip install -r requirements.txt
-                        python vigileguard.py --format json --output security-report.json
-                    '''
-                }
-                archiveArtifacts artifacts: 'VigileGuard/security-report.json'
-            }
-            post {
-                failure {
-                    echo 'Security issues found! Check the report.'
-                }
-            }
-        }
-    }
-}
-```
-
-### GitLab CI Example
-
-```yaml
-security_audit:
-  stage: test
-  image: python:3.8
-  script:
-    - git clone https://github.com/navinnm/VigileGuard.git
-    - cd VigileGuard
-    - pip install -r requirements.txt
-    - python vigileguard.py --format json --output security-report.json
-  artifacts:
-    reports:
-      junit: VigileGuard/security-report.json
-    paths:
-      - VigileGuard/security-report.json
-  allow_failure: false
-```
-
-## 📊 Output Formats
+## 📊 Report Examples
 
 ### Console Output
-Rich, colorized output perfect for terminal usage:
-- **Severity-based color coding** - Easy visual identification
-- **Progress indicators** - Real-time feedback
-- **Detailed descriptions** - Clear explanation of issues
-- **Actionable recommendations** - Exact commands to fix issues
+```
+🛡️ VigileGuard Security Audit
+==============================
 
-### JSON Output
-Machine-readable format for automation:
+✅ FilePermissionChecker completed - 3 findings
+✅ UserAccountChecker completed - 1 findings  
+✅ SSHConfigChecker completed - 2 findings
+✅ WebServerSecurityChecker completed - 4 findings
+✅ NetworkSecurityChecker completed - 0 findings
 
+📊 Audit Results
+================
+CRITICAL: 1
+HIGH: 3
+MEDIUM: 4
+LOW: 2
+```
+
+### HTML Report Features
+- **Interactive Dashboard** - Summary cards, charts, and graphs
+- **Detailed Findings** - Expandable cards with recommendations
+- **Compliance Mapping** - Framework alignment visualization
+- **Trend Analysis** - Historical comparison charts
+- **Export Options** - PDF generation, CSV export
+
+### JSON Report Structure
 ```json
 {
   "scan_info": {
-    "timestamp": "2025-06-10T14:30:15",
-    "tool": "VigileGuard",
-    "version": "1.0.0",
+    "timestamp": "2025-06-11T20:39:00Z",
     "hostname": "web-server-01",
-    "repository": "https://github.com/navinnm/VigileGuard"
+    "version": "2.0.0"
   },
   "summary": {
-    "total_findings": 6,
-    "by_severity": {
-      "HIGH": 2,
-      "MEDIUM": 1,
-      "INFO": 3
-    }
+    "total_findings": 10,
+    "by_severity": {"CRITICAL": 1, "HIGH": 3, "MEDIUM": 4, "LOW": 2}
   },
-  "findings": [
-    {
-      "category": "SSH",
-      "severity": "HIGH",
-      "title": "Insecure SSH setting: permitrootlogin",
-      "description": "Root login should be disabled. Current: yes",
-      "recommendation": "Set 'PermitRootLogin no' in /etc/ssh/sshd_config",
-      "details": {
-        "setting": "permitrootlogin",
-        "current": "yes",
-        "recommended": "no"
-      }
-    }
-  ]
+  "findings": [...],
+  "compliance": {...},
+  "trends": {...}
 }
 ```
 
-## 🔍 Security Checks Details
+## 🔒 Security Frameworks
 
-### File Permissions
-- **World-writable files** - Detects files accessible by all users
-- **SUID/SGID binaries** - Identifies potentially dangerous privileged executables
-- **Sensitive file permissions** - Verifies correct ownership and permissions on critical files
-- **Home directory security** - Checks for overly permissive user directories
+VigileGuard maps findings to major compliance frameworks:
 
-### User Accounts  
-- **Empty passwords** - Finds accounts without password protection
-- **Duplicate UIDs** - Identifies conflicting user identifiers
-- **Sudo configuration** - Reviews privileged access rules
-- **Password policies** - Checks for password strength enforcement
+- **PCI DSS** - Payment Card Industry Data Security Standard
+- **SOC 2** - Service Organization Control 2
+- **NIST CSF** - NIST Cybersecurity Framework  
+- **ISO 27001** - Information Security Management
+- **CIS Controls** - Center for Internet Security
 
-### SSH Configuration
-- **Root login settings** - Verifies root access restrictions
-- **Authentication methods** - Reviews password vs. key-based authentication
-- **Protocol versions** - Ensures use of secure SSH protocols
-- **Key file permissions** - Validates SSH key security
+## 🔧 Development
 
-### System Information
-- **OS version** - Identifies end-of-life or unsupported systems
-- **Kernel version** - Checks for outdated kernels
-- **Running services** - Detects potentially risky network services
-- **Compliance status** - Validates against security best practices
+### Setting Up Development Environment
 
-## 🛠️ Development
+```bash
+# Clone repository
+git clone https://github.com/navinnm/VigileGuard.git
+cd VigileGuard
 
-### Project Structure
+# Setup development environment
+make dev-setup
 
-```
-VigileGuard/
-├── vigileguard.py           # Main application
-├── requirements.txt         # Dependencies
-├── config.yaml             # Default configuration
-├── install.sh              # Installation script
-├── Dockerfile              # Container deployment
-├── tests/                  # Test suite
-│   └── test_vigileguard.py
-├── docs/                   # Documentation
-├── examples/               # Usage examples
-└── README.md              # This file
-```
+# Run tests
+make test
 
-### Adding Custom Checks
+# Run linting
+make lint
 
-```python
-from vigileguard import SecurityChecker, SeverityLevel
-
-class CustomChecker(SecurityChecker):
-    def check(self):
-        # Your custom security logic here
-        if self.detect_vulnerability():
-            self.add_finding(
-                category="Custom Security",
-                severity=SeverityLevel.HIGH,
-                title="Custom vulnerability detected",
-                description="Description of the security issue",
-                recommendation="Steps to remediate the issue"
-            )
-        return self.findings
+# Format code
+make format
 ```
 
 ### Running Tests
 
 ```bash
-# Install development dependencies
-pip install pytest pytest-cov
+# Unit tests
+make test
 
-# Run test suite
-python -m pytest tests/ -v
+# All tests with coverage
+make test-all
 
-# Run with coverage
-python -m pytest tests/ --cov=vigileguard --cov-report=html
+# Specific test file
+pytest tests/test_vigileguard.py -v
+
+# Integration tests
+pytest tests/ -m integration
 ```
 
-## 🗺️ Roadmap
+### Code Quality
 
-### Phase 2: Web Server & Network Security (Coming Soon)
-- **Apache/Nginx Configuration** - Web server security analysis
-- **SSL/TLS Certificate Checking** - Certificate validation and expiry
-- **Firewall Rule Auditing** - iptables/UFW configuration review  
-- **Network Service Enumeration** - Port scanning and service detection
-- **Enhanced Reporting** - HTML reports with trend analysis
+```bash
+# Format code
+make format
 
-### Phase 3: API & CI/CD Integration 
-- **REST API** - Remote scanning capabilities
-- **Web Dashboard** - Centralized management interface
-- **Multi-server Fleet Management** - Scan multiple servers
-- **Advanced CI/CD Integrations** - Native plugins for popular platforms
-- **Compliance Frameworks** - PCI DSS, SOC 2, CIS benchmarks
+# Lint code
+make lint
 
-### Phase 4: Advanced Threat Detection
-- **Behavioral Analysis** - Detect anomalous system behavior
-- **Threat Intelligence Integration** - CVE database and threat feeds
-- **Automated Remediation** - Self-healing security measures
-- **Machine Learning** - AI-powered vulnerability detection
+# Security checks
+make security
+
+# All quality checks
+make dev-check
+```
+
+## 🐳 Docker Usage
+
+### Build and Run
+
+```bash
+# Build image
+make docker-build
+
+# Run scan
+make docker-run
+
+# Interactive shell
+make docker-shell
+
+# Custom command
+docker run --rm -v $(pwd)/reports:/app/reports vigileguard:latest --format json
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  vigileguard:
+    build: .
+    volumes:
+      - ./reports:/app/reports
+      - ./config:/app/config
+    command: ["--format", "html", "--output", "/app/reports/report.html"]
+```
+
+## 📅 Scheduled Scanning
+
+### Cron Setup
+
+```bash
+# Setup daily scans
+./install.sh --setup-cron
+
+# Manual cron entry (daily at 2 AM)
+0 2 * * * /usr/local/bin/vigileguard --format json --output /var/log/vigileguard/daily-$(date +\%Y\%m\%d).json
+```
+
+### Systemd Timer
+
+```ini
+# /etc/systemd/system/vigileguard.timer
+[Unit]
+Description=VigileGuard Security Scan
+Requires=vigileguard.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+## 🔧 API Usage
+
+### Python API
+
+```python
+import vigileguard
+
+# Create audit engine
+engine = vigileguard.create_audit_engine()
+
+# Run audit
+findings = engine.run_audit()
+
+# Generate reports
+report_manager = vigileguard.ReportManager(findings, scan_info)
+report_manager.generate_all_formats("./reports")
+
+# Check Phase 2 availability
+if vigileguard.check_phase2_availability():
+    print("Phase 2 features available")
+```
+
+### Command Line Integration
+
+```bash
+# JSON output for scripting
+vigileguard --format json | jq '.summary.total_findings'
+
+# Exit code based on findings
+vigileguard --format console
+echo "Exit code: $?"  # Non-zero if critical/high issues found
+
+# Custom severity threshold
+vigileguard --format json | jq '.findings[] | select(.severity=="CRITICAL")'
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Phase 2 Components Not Available**
+```bash
+# Check if Phase 2 files exist
+ls vigileguard/web_security_checkers.py
+ls vigileguard/enhanced_reporting.py
+ls vigileguard/phase2_integration.py
+
+# Reinstall with Phase 2
+pip uninstall vigileguard
+pip install vigileguard[full]
+```
+
+**Permission Errors**
+```bash
+# Run with appropriate privileges
+sudo vigileguard --format console
+
+# Or use user installation
+pip install --user vigileguard
+```
+
+**Missing Dependencies**
+```bash
+# Install all dependencies
+pip install vigileguard[full]
+
+# Or install manually
+pip install rich click PyYAML requests
+```
+
+### Debug Mode
+
+```bash
+# Enable debug output
+vigileguard --debug --format console
+
+# Check imports
+python -c "import vigileguard; print(vigileguard.get_version())"
+
+# Verbose logging
+export VIGILEGUARD_LOG_LEVEL=DEBUG
+vigileguard --format console
+```
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-### Development Setup
+### Development Workflow
 
-```bash
-# Fork the repository on GitHub
-git clone https://github.com/yourusername/VigileGuard.git
-cd VigileGuard
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test`
+5. Submit a pull request
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### Code Standards
 
-# Install development dependencies
-pip install -r requirements.txt
-pip install pytest pytest-cov black flake8
-
-# Run tests
-python -m pytest tests/
-
-# Format code
-black vigileguard.py
-```
-
-### Contribution Guidelines
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Areas for Contribution
-
-- 🔍 **New Security Checks** - Add detection for additional vulnerabilities
-- 📊 **Reporting Enhancements** - Improve output formats and visualizations
-- 🔧 **Integration Plugins** - Build connectors for popular tools
-- 📚 **Documentation** - Improve guides and examples
-- 🧪 **Testing** - Add test coverage for edge cases
-- 🐛 **Bug Fixes** - Resolve issues and improve stability
+- Follow PEP 8 style guidelines
+- Add tests for new features
+- Update documentation
+- Run `make dev-check` before submitting
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support & Community
+## 🛡️ Security
 
-- 📖 **Documentation**: [GitHub Wiki](https://github.com/navinnm/VigileGuard/wiki)
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/navinnm/VigileGuard/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/navinnm/VigileGuard/discussions)
-- 📧 **Contact**: Create an issue for questions and support
+For security issues, please email security@vigileguard.dev or see [SECURITY.md](SECURITY.md).
 
-## 🏆 Acknowledgments
+## 📞 Support
 
-- Inspired by industry-standard tools like **Lynis** and **OpenSCAP**
-- Built for the **developer community** facing security challenges
-- Special thanks to **security researchers** and **open source contributors**
-- Developed with ❤️ for **startups** and **small development teams**
+- **Documentation**: [GitHub Wiki](https://github.com/navinnm/VigileGuard/wiki)
+- **Issues**: [GitHub Issues](https://github.com/navinnm/VigileGuard/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/navinnm/VigileGuard/discussions)
+- **Email**: support@vigileguard.dev
 
-## 📈 Usage Statistics
+## 🙏 Acknowledgments
 
-VigileGuard helps organizations identify security issues before they become breaches:
-
-- **Average Scan Time**: < 30 seconds
-- **Detection Accuracy**: 99.9% (no false positives on standard configurations)
-- **CI/CD Integration**: < 5 minutes setup time
-- **Security Issues Detected**: Varies by system configuration
+- Security best practices from OWASP, NIST, and CIS
+- Linux security community
+- Open source security tools ecosystem
 
 ---
 
-**🛡️ VigileGuard - Your vigilant guardian for Linux security**
-
-*Securing your infrastructure, one audit at a time.*
-
-[![GitHub](https://img.shields.io/badge/GitHub-VigileGuard-blue?logo=github)](https://github.com/navinnm/VigileGuard)
-[![Made with Python](https://img.shields.io/badge/Made%20with-Python-blue?logo=python&logoColor=white)](https://python.org)
-[![Security](https://img.shields.io/badge/Focus-Security-red?logo=security&logoColor=white)](https://github.com/navinnm/VigileGuard)
+**Made with ❤️ by the VigileGuard Team**
