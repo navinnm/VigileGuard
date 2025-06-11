@@ -119,139 +119,740 @@ class SecurityChecker:
 
 
 class FilePermissionChecker(SecurityChecker):
-    """Check file and directory permissions for security issues"""
+    """Enhanced file and directory permissions checker with detailed reporting"""
+
+    def __init__(self):
+        super().__init__()
+        # Define important directories to scan
+        self.scan_directories = [
+            "/etc", "/usr", "/var", "/opt", "/srv", "/home",
+            "/var/www", "/var/www/html", "/usr/share/nginx",
+            "/srv/http", "/opt/nginx", "/opt/apache",
+            "/var/log", "/tmp", "/var/tmp"
+        ]
+        
+        # Define critical system files that should have specific permissions
+        self.critical_files = {
+            '/etc/passwd': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'User account information'},
+            '/etc/shadow': {'expected_mode': 0o640, 'owner': 'root', 'group': 'shadow', 'description': 'User password hashes'},
+            '/etc/group': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'Group information'},
+            '/etc/gshadow': {'expected_mode': 0o640, 'owner': 'root', 'group': 'shadow', 'description': 'Group password hashes'},
+            '/etc/sudoers': {'expected_mode': 0o440, 'owner': 'root', 'group': 'root', 'description': 'Sudo configuration'},
+            '/etc/ssh/sshd_config': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'SSH daemon configuration'},
+            '/etc/fstab': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'Filesystem mount table'},
+            '/etc/hosts': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'Host name resolution'},
+            '/etc/crontab': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'System cron jobs'},
+            '/boot/grub/grub.cfg': {'expected_mode': 0o644, 'owner': 'root', 'group': 'root', 'description': 'GRUB bootloader configuration'},
+        }
+        
+        # Web-specific directories and files to check
+        self.web_directories = [
+            "/var/www", "/var/www/html", "/usr/share/nginx/html",
+            "/srv/http", "/srv/www", "/opt/nginx/html",
+            "/var/apache", "/var/apache2", "/etc/apache2",
+            "/etc/nginx", "/etc/httpd"
+        ]
 
     def check(self) -> List[Finding]:
-        """Run file permission checks"""
+        """Run comprehensive file permission checks"""
         if RICH_AVAILABLE:
-            console.print("🔍 Checking file permissions...", style="yellow")
+            console.print("🔍 Checking file permissions (comprehensive scan)...", style="yellow")
         else:
-            print("🔍 Checking file permissions...")
+            print("🔍 Checking file permissions (comprehensive scan)...")
 
-        # Check world-writable files
-        self._check_world_writable_files()
+        # Comprehensive world-writable files check
+        self._check_world_writable_files_detailed()
+        
+        # Check web directory permissions specifically
+        self._check_web_directory_permissions()
 
-        # Check SUID/SGID binaries
-        self._check_suid_sgid_files()
+        # Check SUID/SGID binaries with detailed analysis
+        self._check_suid_sgid_files_detailed()
 
-        # Check sensitive file permissions
-        self._check_sensitive_files()
+        # Check critical system file permissions
+        self._check_critical_system_files()
 
         # Check home directory permissions
-        self._check_home_directories()
+        self._check_home_directories_detailed()
+        
+        # Check temporary directory permissions
+        self._check_temporary_directories()
+        
+        # Check log file permissions
+        self._check_log_file_permissions()
+        
+        # Check configuration file permissions
+        self._check_config_file_permissions()
 
         return self.findings
 
-    def _check_world_writable_files(self):
-        """Find world-writable files and directories"""
-        cmd = "find /etc /usr /var -type f -perm -002 2>/dev/null | head -20"
-        returncode, stdout, stderr = self.run_command(cmd)
+    def _check_world_writable_files_detailed(self):
+        """Enhanced world-writable files check with detailed categorization"""
+        if RICH_AVAILABLE:
+            console.print("  📋 Scanning for world-writable files...", style="blue")
+        else:
+            print("  📋 Scanning for world-writable files...")
+        
+        all_world_writable = {}
+        
+        # Scan each directory separately for better categorization
+        for directory in self.scan_directories:
+            if os.path.exists(directory):
+                # Use more comprehensive find command
+                cmd = f"find '{directory}' -type f -perm -002 2>/dev/null"
+                returncode, stdout, stderr = self.run_command(cmd)
+                
+                if returncode == 0 and stdout.strip():
+                    files = [f for f in stdout.strip().split('\n') if f and os.path.exists(f)]
+                    if files:
+                        all_world_writable[directory] = files
 
-        if returncode == 0 and stdout.strip():
-            files = [f for f in stdout.strip().split('\n') if f]
-            if files:
-                self.add_finding(
-                    category="File Permissions",
-                    severity=SeverityLevel.HIGH,
-                    title="World-writable files found",
-                    description=(f"Found {len(files)} world-writable files "
-                                f"in system directories"),
-                    recommendation="Remove world-write permissions: chmod o-w <filename>",
-                    details={"files": files[:10]}  # Limit to first 10
-                )
+        # Categorize and report findings
+        total_files = sum(len(files) for files in all_world_writable.values())
+        
+        if total_files > 0:
+            # Categorize files by type
+            categorized_files = self._categorize_world_writable_files(all_world_writable)
+            
+            # Create detailed finding
+            self.add_finding(
+                category="File Permissions",
+                severity=self._determine_world_writable_severity(categorized_files),
+                title=f"World-writable files detected ({total_files} files)",
+                description=self._generate_world_writable_description(categorized_files, total_files),
+                recommendation=self._generate_world_writable_recommendations(categorized_files),
+                details={
+                    "total_files": total_files,
+                    "by_directory": {dir: len(files) for dir, files in all_world_writable.items()},
+                    "categorized_files": categorized_files,
+                    "scan_directories": self.scan_directories
+                }
+            )
 
-    def _check_suid_sgid_files(self):
-        """Find SUID and SGID binaries"""
-        cmd = ("find /usr /bin /sbin -type f \\( -perm -4000 -o -perm -2000 \\) "
-               "2>/dev/null")
-        returncode, stdout, stderr = self.run_command(cmd)
-
-        if returncode == 0 and stdout.strip():
-            files = stdout.strip().split('\n')
-
-            # Known safe SUID/SGID files (common ones)
-            safe_files = {
-                '/usr/bin/sudo', '/usr/bin/su', '/usr/bin/passwd',
-                '/usr/bin/chsh', '/usr/bin/chfn', '/usr/bin/newgrp',
-                '/usr/bin/gpasswd', '/bin/ping', '/bin/mount', '/bin/umount'
-            }
-
-            suspicious_files = [f for f in files if f not in safe_files]
-
-            if suspicious_files:
-                self.add_finding(
-                    category="File Permissions",
-                    severity=SeverityLevel.MEDIUM,
-                    title="Unusual SUID/SGID binaries found",
-                    description=(f"Found {len(suspicious_files)} potentially "
-                                f"unnecessary SUID/SGID files"),
-                    recommendation=("Review each file and remove SUID/SGID bits if not "
-                                   "needed: chmod u-s <filename>"),
-                    details={"files": suspicious_files}
-                )
-
-    def _check_sensitive_files(self):
-        """Check permissions on sensitive system files"""
-        sensitive_files = {
-            '/etc/passwd': (0o644, 'root', 'root'),
-            '/etc/shadow': (0o640, 'root', 'shadow'),
-            '/etc/group': (0o644, 'root', 'root'),
-            '/etc/gshadow': (0o640, 'root', 'shadow'),
-            '/etc/sudoers': (0o440, 'root', 'root'),
+    def _categorize_world_writable_files(self, all_files: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        """Categorize world-writable files by type and risk level"""
+        categories = {
+            "critical_system": [],
+            "web_content": [],
+            "log_files": [],
+            "temporary_files": [],
+            "config_files": [],
+            "executable_files": [],
+            "data_files": [],
+            "other": []
         }
+        
+        # Web-related patterns
+        web_patterns = ['/var/www', '/usr/share/nginx', '/srv/http', '/srv/www', 'html', 'public_html', 'htdocs']
+        
+        # Critical system patterns
+        critical_patterns = ['/etc/', '/usr/bin/', '/usr/sbin/', '/bin/', '/sbin/']
+        
+        # Log file patterns
+        log_patterns = ['/var/log/', '.log', '/var/log', 'log']
+        
+        # Config file patterns
+        config_patterns = ['.conf', '.cfg', '.ini', '.yaml', '.yml', '.json', 'config']
+        
+        for directory, files in all_files.items():
+            for file_path in files:
+                try:
+                    # Get file info
+                    stat_info = os.stat(file_path)
+                    is_executable = bool(stat_info.st_mode & stat.S_IXUSR)
+                    
+                    # Categorize based on path and properties
+                    if any(pattern in file_path for pattern in critical_patterns):
+                        categories["critical_system"].append(file_path)
+                    elif any(pattern in file_path for pattern in web_patterns):
+                        categories["web_content"].append(file_path)
+                    elif any(pattern in file_path for pattern in log_patterns):
+                        categories["log_files"].append(file_path)
+                    elif '/tmp/' in file_path or '/var/tmp/' in file_path:
+                        categories["temporary_files"].append(file_path)
+                    elif any(pattern in file_path for pattern in config_patterns):
+                        categories["config_files"].append(file_path)
+                    elif is_executable:
+                        categories["executable_files"].append(file_path)
+                    elif file_path.endswith(('.txt', '.data', '.db', '.sql', '.csv')):
+                        categories["data_files"].append(file_path)
+                    else:
+                        categories["other"].append(file_path)
+                        
+                except (OSError, PermissionError):
+                    categories["other"].append(file_path)
+        
+        # Remove empty categories
+        return {k: v for k, v in categories.items() if v}
 
-        for filepath, (expected_mode, expected_owner, expected_group) in sensitive_files.items():
+    def _determine_world_writable_severity(self, categorized_files: Dict[str, List[str]]) -> SeverityLevel:
+        """Determine severity based on file categories"""
+        if categorized_files.get("critical_system"):
+            return SeverityLevel.CRITICAL
+        elif categorized_files.get("executable_files") or categorized_files.get("config_files"):
+            return SeverityLevel.HIGH
+        elif categorized_files.get("web_content") or categorized_files.get("data_files"):
+            return SeverityLevel.MEDIUM
+        else:
+            return SeverityLevel.LOW
+
+    def _generate_world_writable_description(self, categorized_files: Dict[str, List[str]], total: int) -> str:
+        """Generate detailed description of world-writable files"""
+        description = f"Found {total} world-writable files across the system. "
+        
+        high_risk_categories = []
+        if categorized_files.get("critical_system"):
+            high_risk_categories.append(f"{len(categorized_files['critical_system'])} critical system files")
+        if categorized_files.get("executable_files"):
+            high_risk_categories.append(f"{len(categorized_files['executable_files'])} executable files")
+        if categorized_files.get("config_files"):
+            high_risk_categories.append(f"{len(categorized_files['config_files'])} configuration files")
+        if categorized_files.get("web_content"):
+            high_risk_categories.append(f"{len(categorized_files['web_content'])} web content files")
+        
+        if high_risk_categories:
+            description += f"HIGH PRIORITY: {', '.join(high_risk_categories)}. "
+        
+        description += "World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+        
+        return description
+
+    def _generate_world_writable_recommendations(self, categorized_files: Dict[str, List[str]]) -> str:
+        """Generate specific recommendations based on file categories"""
+        recommendations = []
+        
+        if categorized_files.get("critical_system"):
+            recommendations.append("URGENT: Remove world-write permissions from critical system files immediately")
+        
+        if categorized_files.get("web_content"):
+            recommendations.append("Review web content permissions - consider using group ownership instead of world-writable")
+        
+        if categorized_files.get("executable_files"):
+            recommendations.append("Remove world-write permissions from executable files to prevent code injection")
+        
+        if categorized_files.get("config_files"):
+            recommendations.append("Secure configuration files with proper ownership (root:root) and mode 644")
+        
+        recommendations.append("Use 'chmod o-w <filename>' to remove world-write permissions")
+        recommendations.append("Consider using ACLs (setfacl) for fine-grained access control where needed")
+        
+        return ". ".join(recommendations)
+
+    def _check_web_directory_permissions(self):
+        """Specific check for web directory permissions"""
+        if RICH_AVAILABLE:
+            console.print("  🌐 Checking web directory permissions...", style="blue")
+        else:
+            print("  🌐 Checking web directory permissions...")
+        
+        web_issues = {}
+        
+        for web_dir in self.web_directories:
+            if os.path.exists(web_dir):
+                issues = []
+                
+                # Check directory permissions
+                try:
+                    stat_info = os.stat(web_dir)
+                    mode = stat.S_IMODE(stat_info.st_mode)
+                    
+                    # Web directories should typically be 755 (rwxr-xr-x)
+                    if mode & 0o002:  # World writable
+                        issues.append("Directory is world-writable")
+                    if mode & 0o020:  # Group writable (might be intentional)
+                        issues.append("Directory is group-writable")
+                        
+                except (OSError, PermissionError):
+                    issues.append("Cannot read directory permissions")
+                
+                # Check for common web files with wrong permissions
+                web_files_to_check = []
+                try:
+                    for root, dirs, files in os.walk(web_dir):
+                        for file in files[:50]:  # Limit to first 50 files per directory
+                            if file.endswith(('.html', '.php', '.js', '.css', '.htaccess', '.config')):
+                                web_files_to_check.append(os.path.join(root, file))
+                        # Don't go too deep
+                        if len(root.replace(web_dir, '').split('/')) > 3:
+                            dirs[:] = []
+                except (OSError, PermissionError):
+                    pass
+                
+                risky_web_files = []
+                for file_path in web_files_to_check:
+                    try:
+                        stat_info = os.stat(file_path)
+                        mode = stat.S_IMODE(stat_info.st_mode)
+                        if mode & 0o002:  # World writable
+                            risky_web_files.append(file_path)
+                    except (OSError, PermissionError):
+                        continue
+                
+                if risky_web_files:
+                    issues.append(f"{len(risky_web_files)} web files are world-writable")
+                
+                if issues:
+                    web_issues[web_dir] = {
+                        "issues": issues,
+                        "risky_files": risky_web_files[:10]  # Limit to first 10
+                    }
+        
+        if web_issues:
+            severity = SeverityLevel.HIGH if any("world-writable" in str(issues) for issues in web_issues.values()) else SeverityLevel.MEDIUM
+            
+            self.add_finding(
+                category="Web Security",
+                severity=severity,
+                title="Web directory permission issues detected",
+                description=f"Found permission issues in {len(web_issues)} web directories. " +
+                           "Incorrect web directory permissions can lead to unauthorized file modifications, " +
+                           "code injection, or exposure of sensitive files.",
+                recommendation="Set web directories to 755 (rwxr-xr-x) and web files to 644 (rw-r--r--). " +
+                              "Use proper web server user/group ownership. Consider using a separate user for web content.",
+                details={
+                    "web_issues": web_issues,
+                    "directories_checked": self.web_directories
+                }
+            )
+
+    def _check_suid_sgid_files_detailed(self):
+        """Enhanced SUID/SGID files check with risk assessment"""
+        if RICH_AVAILABLE:
+            console.print("  🔐 Analyzing SUID/SGID binaries...", style="blue")
+        else:
+            print("  🔐 Analyzing SUID/SGID binaries...")
+        
+        # Find SUID and SGID files
+        cmd = "find /usr /bin /sbin /opt /var -type f \\( -perm -4000 -o -perm -2000 \\) 2>/dev/null"
+        returncode, stdout, stderr = self.run_command(cmd)
+
+        if returncode == 0 and stdout.strip():
+            all_files = stdout.strip().split('\n')
+            
+            # Known safe SUID/SGID files with reasons
+            known_safe = {
+                '/usr/bin/sudo': 'System administration',
+                '/usr/bin/su': 'User switching',
+                '/usr/bin/passwd': 'Password management',
+                '/usr/bin/chsh': 'Shell changing',
+                '/usr/bin/chfn': 'User info changing',
+                '/usr/bin/newgrp': 'Group switching',
+                '/usr/bin/gpasswd': 'Group password management',
+                '/bin/ping': 'Network diagnostics',
+                '/bin/ping6': 'IPv6 network diagnostics',
+                '/bin/mount': 'Filesystem mounting',
+                '/bin/umount': 'Filesystem unmounting',
+                '/usr/bin/pkexec': 'PolicyKit execution',
+                '/usr/lib/openssh/ssh-keysign': 'SSH key signing',
+                '/usr/lib/dbus-1.0/dbus-daemon-launch-helper': 'D-Bus helper',
+                '/usr/bin/at': 'Job scheduling',
+                '/usr/bin/crontab': 'Cron job management'
+            }
+            
+            # Categorize files
+            safe_files = []
+            suspicious_files = []
+            unknown_files = []
+            
+            for file_path in all_files:
+                if file_path in known_safe:
+                    safe_files.append((file_path, known_safe[file_path]))
+                elif any(safe_path in file_path for safe_path in known_safe.keys()):
+                    # Partial match - might be safe
+                    unknown_files.append(file_path)
+                else:
+                    suspicious_files.append(file_path)
+            
+            # Analyze suspicious files
+            detailed_suspicious = []
+            for file_path in suspicious_files:
+                try:
+                    stat_info = os.stat(file_path)
+                    owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                    group = grp.getgrgid(stat_info.st_gid).gr_name
+                    mode = stat.S_IMODE(stat_info.st_mode)
+                    
+                    is_suid = bool(mode & stat.S_ISUID)
+                    is_sgid = bool(mode & stat.S_ISGID)
+                    
+                    detailed_suspicious.append({
+                        "path": file_path,
+                        "owner": owner,
+                        "group": group,
+                        "suid": is_suid,
+                        "sgid": is_sgid,
+                        "mode": oct(mode)
+                    })
+                except (OSError, KeyError):
+                    detailed_suspicious.append({
+                        "path": file_path,
+                        "owner": "unknown",
+                        "group": "unknown",
+                        "suid": "unknown",
+                        "sgid": "unknown",
+                        "mode": "unknown"
+                    })
+            
+            # Report findings
+            if suspicious_files or unknown_files:
+                severity = SeverityLevel.HIGH if suspicious_files else SeverityLevel.MEDIUM
+                
+                description = f"Found {len(all_files)} SUID/SGID binaries: "
+                description += f"{len(safe_files)} known safe, "
+                description += f"{len(suspicious_files)} suspicious, "
+                description += f"{len(unknown_files)} need review. "
+                description += "SUID/SGID binaries run with elevated privileges and can be security risks if compromised."
+                
+                self.add_finding(
+                    category="File Permissions",
+                    severity=severity,
+                    title="Suspicious SUID/SGID binaries detected",
+                    description=description,
+                    recommendation="Review each suspicious binary. Remove SUID/SGID bits if not needed: 'chmod u-s <file>' or 'chmod g-s <file>'. " +
+                                  "Ensure suspicious binaries are from trusted sources and properly maintained.",
+                    details={
+                        "total_count": len(all_files),
+                        "safe_files": safe_files,
+                        "suspicious_files": detailed_suspicious,
+                        "unknown_files": unknown_files
+                    }
+                )
+
+    def _check_critical_system_files(self):
+        """Check permissions on critical system files"""
+        if RICH_AVAILABLE:
+            console.print("  🔒 Verifying critical system file permissions...", style="blue")
+        else:
+            print("  🔒 Verifying critical system file permissions...")
+        
+        issues_found = {}
+        
+        for filepath, expected in self.critical_files.items():
             if os.path.exists(filepath):
                 try:
                     stat_info = os.stat(filepath)
                     actual_mode = stat.S_IMODE(stat_info.st_mode)
                     actual_owner = pwd.getpwuid(stat_info.st_uid).pw_name
                     actual_group = grp.getgrgid(stat_info.st_gid).gr_name
-
+                    
                     issues = []
-                    if actual_mode != expected_mode:
-                        issues.append(f"mode {oct(actual_mode)} "
-                                     f"(expected {oct(expected_mode)})")
-                    if actual_owner != expected_owner:
-                        issues.append(f"owner {actual_owner} "
-                                     f"(expected {expected_owner})")
-                    if actual_group != expected_group:
-                        issues.append(f"group {actual_group} "
-                                     f"(expected {expected_group})")
-
+                    if actual_mode != expected['expected_mode']:
+                        issues.append(f"mode {oct(actual_mode)} (expected {oct(expected['expected_mode'])})")
+                    if actual_owner != expected['owner']:
+                        issues.append(f"owner {actual_owner} (expected {expected['owner']})")
+                    if actual_group != expected['group']:
+                        issues.append(f"group {actual_group} (expected {expected['group']})")
+                    
                     if issues:
-                        self.add_finding(
-                            category="File Permissions",
-                            severity=SeverityLevel.HIGH,
-                            title=f"Incorrect permissions on {filepath}",
-                            description=(f"Security-sensitive file has incorrect "
-                                        f"{', '.join(issues)}"),
-                            recommendation=(f"Fix with: chown {expected_owner}:"
-                                          f"{expected_group} {filepath} && "
-                                          f"chmod {oct(expected_mode)} {filepath}"),
-                            details={"file": filepath, "issues": issues}
-                        )
-                except (OSError, KeyError):
-                    pass
+                        issues_found[filepath] = {
+                            "description": expected['description'],
+                            "issues": issues,
+                            "current": {
+                                "mode": oct(actual_mode),
+                                "owner": actual_owner,
+                                "group": actual_group
+                            },
+                            "expected": expected
+                        }
+                        
+                except (OSError, KeyError) as e:
+                    issues_found[filepath] = {
+                        "description": expected['description'],
+                        "issues": [f"Cannot read file: {e}"],
+                        "current": "unknown",
+                        "expected": expected
+                    }
+        
+        if issues_found:
+            self.add_finding(
+                category="File Permissions",
+                severity=SeverityLevel.HIGH,
+                title=f"Critical system file permission issues ({len(issues_found)} files)",
+                description=f"Found permission issues on {len(issues_found)} critical system files. " +
+                           "These files are essential for system security and must have correct permissions.",
+                recommendation="Fix permissions immediately using chown and chmod commands. " +
+                              "Example: chown root:root /etc/passwd && chmod 644 /etc/passwd",
+                details={"critical_files_issues": issues_found}
+            )
 
-    def _check_home_directories(self):
-        """Check home directory permissions"""
-        cmd = "find /home -maxdepth 1 -type d -perm -002 2>/dev/null"
-        returncode, stdout, stderr = self.run_command(cmd)
+    def _check_home_directories_detailed(self):
+        """Enhanced home directory permissions check"""
+        if RICH_AVAILABLE:
+            console.print("  🏠 Checking home directory permissions...", style="blue")
+        else:
+            print("  🏠 Checking home directory permissions...")
+        
+        home_issues = {}
+        
+        # Check /home directory itself
+        if os.path.exists('/home'):
+            try:
+                # Find all user home directories
+                cmd = "find /home -maxdepth 1 -type d 2>/dev/null"
+                returncode, stdout, stderr = self.run_command(cmd)
+                
+                if returncode == 0:
+                    home_dirs = [d for d in stdout.strip().split('\n') if d and d != '/home']
+                    
+                    for home_dir in home_dirs:
+                        issues = []
+                        try:
+                            stat_info = os.stat(home_dir)
+                            mode = stat.S_IMODE(stat_info.st_mode)
+                            owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                            
+                            # Check for world-writable
+                            if mode & 0o002:
+                                issues.append("World-writable")
+                            
+                            # Check for world-readable (privacy concern)
+                            if mode & 0o004:
+                                issues.append("World-readable")
+                            
+                            # Check for group-writable (potential issue)
+                            if mode & 0o020:
+                                issues.append("Group-writable")
+                            
+                            # Check if owner matches directory name
+                            expected_owner = os.path.basename(home_dir)
+                            if owner != expected_owner and expected_owner != 'lost+found':
+                                issues.append(f"Owner mismatch: {owner} (expected {expected_owner})")
+                            
+                            if issues:
+                                home_issues[home_dir] = {
+                                    "issues": issues,
+                                    "mode": oct(mode),
+                                    "owner": owner,
+                                    "recommended_mode": "750"
+                                }
+                                
+                        except (OSError, KeyError):
+                            home_issues[home_dir] = {
+                                "issues": ["Cannot read directory info"],
+                                "mode": "unknown",
+                                "owner": "unknown",
+                                "recommended_mode": "750"
+                            }
+                            
+            except Exception:
+                pass
+        
+        if home_issues:
+            severity = SeverityLevel.HIGH if any("World-writable" in str(issue) for issue in home_issues.values()) else SeverityLevel.MEDIUM
+            
+            self.add_finding(
+                category="File Permissions",
+                severity=severity,
+                title=f"Home directory permission issues ({len(home_issues)} directories)",
+                description=f"Found permission issues in {len(home_issues)} home directories. " +
+                           "Incorrect home directory permissions can expose user data or allow unauthorized access.",
+                recommendation="Set home directories to mode 750 (rwxr-x---) or 700 (rwx------). " +
+                              "Ensure correct ownership: chown user:user /home/user && chmod 750 /home/user",
+                details={"home_directory_issues": home_issues}
+            )
 
-        if returncode == 0 and stdout.strip():
-            dirs = [d for d in stdout.strip().split('\n')
-                   if d and d != '/home']
-            if dirs:
-                self.add_finding(
-                    category="File Permissions",
-                    severity=SeverityLevel.MEDIUM,
-                    title="World-writable home directories found",
-                    description=f"Found {len(dirs)} world-writable home directories",
-                    recommendation="Remove world-write permissions: chmod o-w <directory>",
-                    details={"directories": dirs}
-                )
+    def _check_temporary_directories(self):
+        """Check permissions on temporary directories"""
+        if RICH_AVAILABLE:
+            console.print("  📁 Checking temporary directory permissions...", style="blue")
+        else:
+            print("  📁 Checking temporary directory permissions...")
+        
+        temp_dirs = ['/tmp', '/var/tmp', '/dev/shm']
+        temp_issues = {}
+        
+        for temp_dir in temp_dirs:
+            if os.path.exists(temp_dir):
+                try:
+                    stat_info = os.stat(temp_dir)
+                    mode = stat.S_IMODE(stat_info.st_mode)
+                    
+                    issues = []
+                    
+                    # Check for sticky bit
+                    if not (mode & stat.S_ISVTX):
+                        issues.append("Missing sticky bit (security risk)")
+                    
+                    # Check if world writable (should be for temp dirs)
+                    if not (mode & 0o002):
+                        issues.append("Not world-writable (may cause application issues)")
+                    
+                    # Check for incorrect permissions
+                    expected_mode = 0o1777  # rwxrwxrwt
+                    if mode != expected_mode:
+                        issues.append(f"Incorrect mode {oct(mode)} (expected {oct(expected_mode)})")
+                    
+                    if issues:
+                        temp_issues[temp_dir] = {
+                            "issues": issues,
+                            "current_mode": oct(mode),
+                            "expected_mode": oct(expected_mode)
+                        }
+                        
+                except (OSError, PermissionError):
+                    temp_issues[temp_dir] = {
+                        "issues": ["Cannot read directory permissions"],
+                        "current_mode": "unknown",
+                        "expected_mode": "1777"
+                    }
+        
+        if temp_issues:
+            self.add_finding(
+                category="File Permissions",
+                severity=SeverityLevel.MEDIUM,
+                title="Temporary directory permission issues",
+                description="Temporary directories have incorrect permissions. " +
+                           "These directories should have sticky bit set to prevent users from deleting other users' files.",
+                recommendation="Set correct permissions on temporary directories: chmod 1777 /tmp /var/tmp",
+                details={"temp_directory_issues": temp_issues}
+            )
 
+    def _check_log_file_permissions(self):
+        """Check permissions on log files"""
+        if RICH_AVAILABLE:
+            console.print("  📄 Checking log file permissions...", style="blue")
+        else:
+            print("  📄 Checking log file permissions...")
+        
+        # Find log files
+        log_dirs = ['/var/log', '/var/log/apache2', '/var/log/nginx', '/var/log/mysql']
+        risky_log_files = []
+        
+        for log_dir in log_dirs:
+            if os.path.exists(log_dir):
+                cmd = f"find '{log_dir}' -type f -name '*.log' -o -name '*.log.*' 2>/dev/null | head -20"
+                returncode, stdout, stderr = self.run_command(cmd)
+                
+                if returncode == 0 and stdout.strip():
+                    log_files = stdout.strip().split('\n')
+                    
+                    for log_file in log_files:
+                        try:
+                            stat_info = os.stat(log_file)
+                            mode = stat.S_IMODE(stat_info.st_mode)
+                            
+                            # Check for world-readable log files (may contain sensitive info)
+                            if mode & 0o004:
+                                risky_log_files.append({
+                                    "file": log_file,
+                                    "issue": "World-readable",
+                                    "mode": oct(mode)
+                                })
+                            
+                            # Check for world-writable log files
+                            if mode & 0o002:
+                                risky_log_files.append({
+                                    "file": log_file,
+                                    "issue": "World-writable",
+                                    "mode": oct(mode)
+                                })
+                                
+                        except (OSError, PermissionError):
+                            continue
+        
+        if risky_log_files:
+            world_writable = [f for f in risky_log_files if f["issue"] == "World-writable"]
+            severity = SeverityLevel.HIGH if world_writable else SeverityLevel.MEDIUM
+            
+            self.add_finding(
+                category="File Permissions",
+                severity=severity,
+                title=f"Log file permission issues ({len(risky_log_files)} files)",
+                description=f"Found {len(risky_log_files)} log files with permission issues. " +
+                           "Log files may contain sensitive information and should not be world-readable or writable.",
+                recommendation="Set log files to mode 640 (rw-r-----) or 644 (rw-r--r--) and ensure proper ownership. " +
+                              "Use logrotate with proper permissions.",
+                details={"risky_log_files": risky_log_files[:15]}  # Limit to first 15
+            )
+
+    def _check_config_file_permissions(self):
+        """Check permissions on configuration files"""
+        if RICH_AVAILABLE:
+            console.print("  ⚙️ Checking configuration file permissions...", style="blue")
+        else:
+            print("  ⚙️ Checking configuration file permissions...")
+        
+        # Find configuration files
+        config_patterns = [
+            '/etc/*.conf', '/etc/*.cfg', '/etc/*.ini',
+            '/etc/apache2/*.conf', '/etc/nginx/*.conf',
+            '/etc/mysql/*.cnf', '/etc/ssh/*.conf'
+        ]
+        
+        risky_config_files = []
+        
+        # Check common configuration directories
+        config_dirs = ['/etc', '/etc/apache2', '/etc/nginx', '/etc/mysql', '/etc/ssh', '/etc/ssl']
+        
+        for config_dir in config_dirs:
+            if os.path.exists(config_dir):
+                # Find configuration files
+                cmd = f"find '{config_dir}' -maxdepth 2 -type f \\( -name '*.conf' -o -name '*.cfg' -o -name '*.ini' -o -name '*.cnf' \\) 2>/dev/null"
+                returncode, stdout, stderr = self.run_command(cmd)
+                
+                if returncode == 0 and stdout.strip():
+                    config_files = stdout.strip().split('\n')
+                    
+                    for config_file in config_files:
+                        try:
+                            stat_info = os.stat(config_file)
+                            mode = stat.S_IMODE(stat_info.st_mode)
+                            owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                            
+                            issues = []
+                            
+                            # Check for world-writable config files
+                            if mode & 0o002:
+                                issues.append("World-writable")
+                            
+                            # Check for world-readable sensitive configs
+                            sensitive_configs = ['ssh', 'ssl', 'mysql', 'password', 'key', 'cert']
+                            if any(sensitive in config_file.lower() for sensitive in sensitive_configs):
+                                if mode & 0o004:
+                                    issues.append("World-readable (sensitive)")
+                            
+                            # Check for non-root ownership of critical configs
+                            if '/etc/' in config_file and owner != 'root':
+                                issues.append(f"Non-root owner: {owner}")
+                            
+                            if issues:
+                                risky_config_files.append({
+                                    "file": config_file,
+                                    "issues": issues,
+                                    "mode": oct(mode),
+                                    "owner": owner
+                                })
+                                
+                        except (OSError, KeyError, PermissionError):
+                            continue
+        
+        if risky_config_files:
+            # Determine severity based on issues
+            has_world_writable = any("World-writable" in str(f["issues"]) for f in risky_config_files)
+            has_sensitive_readable = any("World-readable (sensitive)" in str(f["issues"]) for f in risky_config_files)
+            
+            if has_world_writable:
+                severity = SeverityLevel.CRITICAL
+            elif has_sensitive_readable:
+                severity = SeverityLevel.HIGH
+            else:
+                severity = SeverityLevel.MEDIUM
+            
+            self.add_finding(
+                category="File Permissions",
+                severity=severity,
+                title=f"Configuration file permission issues ({len(risky_config_files)} files)",
+                description=f"Found {len(risky_config_files)} configuration files with permission issues. " +
+                           "Configuration files often contain sensitive information and should be properly secured.",
+                recommendation="Set configuration files to mode 644 (rw-r--r--) for general configs, " +
+                              "640 (rw-r-----) for sensitive configs, and ensure root ownership. " +
+                              "Use 'chown root:root <config_file> && chmod 644 <config_file>'",
+                details={
+                    "risky_config_files": risky_config_files[:20],  # Limit to first 20
+                    "total_found": len(risky_config_files)
+                }
+            )
+            
 class UserAccountChecker(SecurityChecker):
     """Check user accounts and authentication settings"""
     
