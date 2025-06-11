@@ -18,7 +18,8 @@ import stat
 import pwd
 import grp
 import platform
-from datetime import datetime
+import datetime
+from datetime import datetime as dt
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -86,7 +87,7 @@ class AccountRiskProfile:
     gid: int
     shell: str
     home_dir: str
-    last_login: Optional[datetime.datetime]
+    last_login: Optional[datetime.datetime]  # This will now work
     password_age: int
     failed_logins: int
     privilege_level: str
@@ -991,7 +992,7 @@ class UserAccountChecker(SecurityChecker):
             risk_score += 20  # Old password
         if failed_logins > 5:
             risk_score += 25  # Multiple failed logins
-        if not last_login or (datetime.datetime.now() - last_login).days > 90:
+        if not last_login or (dt.now() - last_login).days > 90:
             risk_score += 15  # Dormant account
         
         return AccountRiskProfile(
