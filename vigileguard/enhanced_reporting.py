@@ -100,16 +100,6 @@ class HTMLReporter:
             <div class="scan-info">
                 <p><strong>Scan Date:</strong> {self.scan_info.get('timestamp', 'Unknown')}</p>
                 <p><strong>Tool Version:</strong> {self.scan_info.get('version', '2.0.1')}</p>
-                <p><strong>Scan Type:</strong> {self.scan_info.get('scan_type', 'Full')}</p>
-                <p><strong>Scan Duration:</strong> {self.scan_info.get('duration', 'Unknown')}</p>
-                <p><strong>Target:</strong> {self.scan_info.get('target', 'Unknown')}</p>
-                <p><strong>Scan ID:</strong> {self.scan_info.get('scan_id', 'N/A')}</p>
-                <p><strong>Scan Status:</strong> {self.scan_info.get('status', 'Completed')}</p>
-                <p><strong>Scan By:</strong> {self.scan_info.get('scanned_by', 'Unknown')}</p>
-                <p><strong>Scan Method:</strong> {self.scan_info.get('scan_method', 'Automated')}</p>
-                <p><strong>Compliance Standards:</strong> {', '.join(self.scan_info.get('compliance_standards', ['N/A']))}</p>
-                <p><strong>Compliance Status:</strong> {self.scan_info.get('compliance_status', 'N/A')}</p>
-                <p><strong>Compliance Score:</strong> {self.scan_info.get('compliance_score', 'N/A')}</p>
                 <p><strong>Repository:</strong> <a href="{self.scan_info.get('repository', '#')}">GitHub</a></p>
             </div>
         </header>
