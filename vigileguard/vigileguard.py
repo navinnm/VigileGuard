@@ -2092,41 +2092,6 @@ class EnhancedHTMLReporter:
         """
 
 
-# Example usage and integration
-if __name__ == "__main__":
-    # Create enhanced checker
-    checker = EnhancedNetworkExposureChecker()
-    
-    # Run comprehensive check
-    findings = checker.check()
-    
-    # Get server summary
-    server_summary = checker.get_server_summary()
-    
-    # Display results
-    print("\n" + "="*60)
-    print("🛡️ ENHANCED VIGILEGUARD NETWORK & SERVER ANALYSIS")
-    print("="*60)
-    
-    print(f"\n📊 SERVER SUMMARY:")
-    print(f"Primary IP: {server_summary.get('primary_ip', 'Unknown')}")
-    print(f"Domain: {server_summary.get('primary_domain', 'No domain configured')}")
-    print(f"Web Server: {server_summary.get('primary_web_server', 'None detected')}")
-    print(f"Languages: {', '.join(server_summary.get('primary_languages', ['None detected']))}")
-    print(f"OS: {server_summary.get('os_info', 'Unknown')}")
-    print(f"Total Services: {server_summary.get('total_services', 0)}")
-    
-    print(f"\n🔍 SECURITY FINDINGS ({len(findings)} total):")
-    for finding in findings:
-        print(f"\n[{finding.severity.value}] {finding.category}: {finding.title}")
-        print(f"  → {finding.description}")
-        if finding.details:
-            print(f"  → Details: {len(finding.details)} items")
-    
-    print("\n" + "="*60)
-    print("✅ Enhanced analysis completed!")
-    print("="*60)
-
 
 class AuditEngine:
     def __init__(self, config_file: Optional[str] = None):
@@ -2449,7 +2414,7 @@ class AuditEngine:
         return json.dumps(report, indent=2)
     
 
-    
+
 @click.command()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--output', '-o', help='Output file path')
@@ -2608,6 +2573,46 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
         
         elif output_format == 'html':
             if not phase2_available:
+                if RICH_AVAILABLE:
+                    console.print("❌ HTML format requires Phase 2 components", style="red")
+                else:
+                    print("❌ HTML format requires Phase 2 components")
+                sys.exit(1)
+            
+            # HTML output (Phase 2) - FIXED VERSION
+            try:
+                # Try to import HTMLReporter
+                html_reporter = None
+                try:
+                    from .enhanced_reporting import HTMLReporter
+                    html_reporter = HTMLReporter
+                except ImportError:
+                    try:
+                        from enhanced_reporting import HTMLReporter
+                        html_reporter = HTMLReporter
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            html_reporter = enhanced_mod.HTMLReporter
+                
+                if html_reporter:
+                    # FIXED: Pass server_summary from engine
+                    reporter = html_reporter(findings, scan_info, getattr(engine, 'server_summary', {}))
+                    output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                    reporter.generate_report(output_file)
+                    if RICH_AVAILABLE:
+                        console.print(f"HTML report saved to {output_file}", style="green")
+                    else:
+                        print(f"HTML report saved to {output_file}")
+                else:
+                    raise ImportError("HTMLReporter not available")
+            except ImportError:
                 if RICH_AVAILABLE:
                     console.print("❌ HTML format requires Phase 2 components", style="red")
                 else:
