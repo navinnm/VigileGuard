@@ -1,52 +1,76 @@
-# MANIFEST.in - Include additional files in source distribution
+# VigileGuard MANIFEST.in
+# Include essential files in the distribution
+
+# Include all Python files in the vigileguard package
+recursive-include vigileguard *.py
+
+# Include configuration files
+include *.yaml
+include *.yml
+include config.yaml
+recursive-include vigileguard *.yaml
+recursive-include vigileguard *.yml
 
 # Include documentation
 include README.md
 include LICENSE
-include SECURITY.md
 include CHANGELOG.md
+include SECURITY.md
 
-# Include configuration files
-include config.yaml
+# Include package metadata
 include pyproject.toml
 include requirements.txt
 
-# Include scripts (make them optional)
-graft scripts
-global-exclude scripts/vigileguard-setup-cron.sh
+# Include scripts
+recursive-include scripts *.sh
+recursive-include scripts *.py
 
-# Include examples and documentation
-graft examples
-recursive-include docs *
+# Include templates and static files
+recursive-include vigileguard/templates *.html
+recursive-include vigileguard/templates *.j2
+recursive-include vigileguard/static *.css
+recursive-include vigileguard/static *.js
 
-# Include test files
-graft tests
-
-# Include package data
-recursive-include vigileguard *.py
-recursive-include vigileguard *.yaml
-recursive-include vigileguard *.yml
-recursive-include vigileguard *.json
-
-# Exclude development and build files
+# Exclude unwanted files and directories
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
 global-exclude __pycache__
-global-exclude *.py[co]
 global-exclude *.so
 global-exclude .git*
-global-exclude .DS_Store
-global-exclude *.egg-info
-prune build
-prune dist
+global-exclude .coverage
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude .tox
+
+# Exclude development and build artifacts
 prune .git
 prune .github
-prune .venv
+prune build
+prune dist
+prune *.egg-info
 prune venv
-prune .pytest_cache
-prune .mypy_cache
-prune .tox
+prune .venv
+prune env
+prune .env
+prune node_modules
 
-# Exclude reports and temporary files
-global-exclude *.log
-global-exclude *.tmp
-prune reports
+# Exclude logs and reports
 prune logs
+prune reports
+prune tmp
+prune temp
+
+# Exclude test files in distribution
+prune tests
+global-exclude test_*.py
+global-exclude *_test.py
+
+# Exclude temporary and backup files
+global-exclude *.tmp
+global-exclude *.log
+global-exclude *.bak
+global-exclude *.swp
+global-exclude *~
+global-exclude .DS_Store
+global-exclude Thumbs.db
