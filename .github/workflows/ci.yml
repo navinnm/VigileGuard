@@ -152,7 +152,6 @@ jobs:
             "vigileguard/web_security_checkers.py"
             "vigileguard/enhanced_reporting.py"
             "vigileguard/phase2_integration.py"
-            "setup.py"
             "pyproject.toml"
             "requirements.txt"
             "README.md"
