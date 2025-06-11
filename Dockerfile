@@ -1,64 +1,110 @@
-# VigileGuard Docker Image - Working Version
-# Repository: https://github.com/navinnm/VigileGuard
-# Secure and functional container for running security audits
+# Dockerfile.dev - Development version with additional tools
 
 FROM python:3.11-slim
 
-# Metadata
-LABEL maintainer="VigileGuard Team <https://github.com/navinnm/VigileGuard>"
-LABEL description="VigileGuard - Linux Security Audit Tool"
-LABEL version="1.0.5"
-LABEL repository="https://github.com/navinnm/VigileGuard"
+# Set environment variables for development
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
 
-# Create non-root user first
-ARG UID=1000
-ARG GID=1000
-RUN groupadd -g ${GID} vigileguard && \
-    useradd -m -u ${UID} -g ${GID} -s /bin/bash vigileguard
+# Create development user
+RUN groupadd -g 1000 vigileguard && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash vigileguard
 
-# Install system dependencies (no version pinning to avoid conflicts)
+# Install system dependencies + development tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # System tools
     git \
     curl \
+    wget \
     procps \
     net-tools \
     openssh-client \
     findutils \
     grep \
     coreutils \
+    vim \
+    nano \
+    less \
+    # Development tools
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    # Network tools for testing
+    nmap \
+    netcat-openbsd \
+    telnet \
+    # Additional utilities
+    tree \
+    htop \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Copy package files
 COPY requirements.txt .
+COPY pyproject.toml .
+COPY setup.py .
+COPY README.md .
+
+# Install Python dependencies + development tools
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+    # Development dependencies
+    pytest \
+    pytest-cov \
+    black \
+    flake8 \
+    mypy \
+    bandit \
+    safety \
+    # Interactive tools
+    ipython \
+    jupyter \
+    # Documentation tools
+    sphinx \
+    mkdocs
 
-# Copy application files
-COPY vigileguard.py .
-COPY config.yaml .
+# Copy source code (this will be overridden by volume in dev)
+COPY vigileguard/ ./vigileguard/
+COPY scripts/ ./scripts/
+COPY tests/ ./tests/
+COPY examples/ ./examples/
 
-# Create config directory and set permissions
-RUN mkdir -p /home/vigileguard/.config/vigileguard && \
-    cp config.yaml /home/vigileguard/.config/vigileguard/ && \
-    chown -R vigileguard:vigileguard /home/vigileguard /app
+# Install VigileGuard in development mode
+RUN pip install --no-cache-dir -e ".[dev,full]"
 
-# Switch to non-root user
+# Create necessary directories
+RUN mkdir -p /app/reports /app/logs /app/temp && \
+    chown -R vigileguard:vigileguard /app
+
+# Switch to development user
 USER vigileguard
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV VIGILEGUARD_CONFIG=/home/vigileguard/.config/vigileguard/config.yaml
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Set up development environment
+RUN echo 'alias ll="ls -la"' >> ~/.bashrc && \
+    echo 'alias la="ls -la"' >> ~/.bashrc && \
+    echo 'alias ..="cd .."' >> ~/.bashrc && \
+    echo 'export PS1="\[\033[01;32m\]\u@vigileguard-dev\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "' >> ~/.bashrc
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python /app/vigileguard.py --help > /dev/null 2>&1 || exit 1
+# Verify installation
+RUN python -c "import vigileguard; print(f'✅ VigileGuard {vigileguard.__version__} (dev) installed')" && \
+    vigileguard --version && \
+    echo "Development environment ready! 🚀"
 
-# Default command
-ENTRYPOINT ["python", "/app/vigileguard.py"]
-CMD ["--help"]
+# Development entry point
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["echo 'VigileGuard Development Environment' && echo 'Available commands:' && echo '  vigileguard --help' && echo '  pytest tests/' && echo '  black vigileguard/' && echo '  flake8 vigileguard/' && echo '' && echo 'Starting interactive shell...' && /bin/bash"]
+
+# Add development labels
+LABEL org.opencontainers.image.title="VigileGuard Development" \
+      org.opencontainers.image.description="VigileGuard Development Environment" \
+      org.opencontainers.image.version="2.0.0-dev" \
+      org.opencontainers.image.source="https://github.com/navinnm/VigileGuard" \
+      environment="development"

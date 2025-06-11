@@ -1,0 +1,145 @@
+# docker-compose.yml - VigileGuard Docker Compose Configuration
+
+version: '3.8'
+
+services:
+  vigileguard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - PYTHON_VERSION=3.11
+    image: vigileguard:latest
+    container_name: vigileguard-scanner
+    
+    # Mount volumes for reports and configuration
+    volumes:
+      - ./reports:/app/reports
+      - ./config:/app/config:ro
+      - type: bind
+        source: ./config.yaml
+        target: /app/config.yaml
+        read_only: true
+    
+    # Environment variables
+    environment:
+      - VIGILEGUARD_ENV=production
+      - VIGILEGUARD_CONFIG=/app/config.yaml
+      - PYTHONPATH=/app
+    
+    # Security settings
+    user: "1000:1000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE  # For reading system files
+    
+    # Temporary directories (writable)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /app/reports:noexec,nosuid,size=500m
+    
+    # Default command
+    command: ["--format", "html", "--output", "/app/reports/security-report.html"]
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Development service with more relaxed security
+  vigileguard-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        - PYTHON_VERSION=3.11
+    image: vigileguard:dev
+    container_name: vigileguard-dev
+    
+    volumes:
+      - .:/app
+      - ./reports:/app/reports
+    
+    environment:
+      - VIGILEGUARD_ENV=development
+      - PYTHONPATH=/app
+    
+    # Interactive mode for development
+    stdin_open: true
+    tty: true
+    
+    command: ["--help"]
+    
+    # More permissive for development
+    user: "1000:1000"
+    working_dir: /app
+
+  # Scheduled scanner service
+  vigileguard-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vigileguard:latest
+    container_name: vigileguard-cron
+    
+    volumes:
+      - ./reports:/app/reports
+      - ./config.yaml:/app/config.yaml:ro
+    
+    environment:
+      - VIGILEGUARD_ENV=production
+      - VIGILEGUARD_CONFIG=/app/config.yaml
+    
+    # Custom entrypoint for cron-like behavior
+    entrypoint: ["/app/scripts/cron-entrypoint.sh"]
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Web server to serve HTML reports
+  report-server:
+    image: nginx:alpine
+    container_name: vigileguard-reports
+    
+    volumes:
+      - ./reports:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    
+    ports:
+      - "8080:80"
+    
+    depends_on:
+      - vigileguard
+    
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    
+    restart: unless-stopped
+
+# Named volumes for persistent data
+volumes:
+  reports:
+    driver: local
+  config:
+    driver: local
+
+# Networks
+networks:
+  default:
+    name: vigileguard-network
+    driver: bridge

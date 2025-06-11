@@ -403,36 +403,56 @@ jobs:
       - name: Create Dockerfile if missing
         run: |
           if [ ! -f Dockerfile ]; then
-            echo "🐳 Creating Dockerfile..."
+            echo "🐳 Creating Dockerfile for package structure..."
             cat > Dockerfile << 'EOF'
-          FROM python:3.8-slim
+          FROM python:3.11-slim
 
-          WORKDIR /app
+          # Set environment variables
+          ENV PYTHONUNBUFFERED=1 \
+              PYTHONDONTWRITEBYTECODE=1 \
+              PIP_NO_CACHE_DIR=1 \
+              PIP_DISABLE_PIP_VERSION_CHECK=1
+
+          # Create non-root user for security
+          RUN groupadd -g 1000 vigileguard && \
+              useradd -m -u 1000 -g 1000 -s /bin/bash vigileguard
 
           # Install system dependencies
-          RUN apt-get update && apt-get install -y \
-              findutils \
-              net-tools \
-              procps \
-              && rm -rf /var/lib/apt/lists/*
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+              git curl procps net-tools openssh-client findutils grep coreutils \
+              && rm -rf /var/lib/apt/lists/* && apt-get clean
+
+          # Set working directory
+          WORKDIR /app
 
           # Copy package files
-          COPY requirements.txt .
-          COPY setup.py .
-          COPY pyproject.toml .
-          COPY README.md .
+          COPY requirements.txt pyproject.toml setup.py README.md config.yaml ./
+
+          # Install dependencies
+          RUN pip install --no-cache-dir --upgrade pip && \
+              pip install --no-cache-dir -r requirements.txt
+
+          # Copy the vigileguard package
           COPY vigileguard/ ./vigileguard/
 
-          # Install the package
+          # Install VigileGuard as package
           RUN pip install --no-cache-dir -e .
 
-          # Create reports directory
-          RUN mkdir -p /app/reports
+          # Create reports directory and set permissions
+          RUN mkdir -p /app/reports && chown -R vigileguard:vigileguard /app
 
-          ENTRYPOINT ["python", "-m", "vigileguard.vigileguard"]
+          # Switch to non-root user
+          USER vigileguard
+
+          # Verify installation
+          RUN python -c "import vigileguard; print(f'VigileGuard {vigileguard.__version__} installed')"
+
+          ENTRYPOINT ["vigileguard"]
           CMD ["--help"]
           EOF
-            echo "✅ Dockerfile created"
+            echo "✅ Dockerfile created for package structure"
+          else
+            echo "✅ Dockerfile already exists"
           fi
 
       - name: Build Docker image
