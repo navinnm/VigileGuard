@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  vigileguard-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: vigileguard-development
+    hostname: vigileguard-dev
+    volumes:
+      # Mount source code for live development
+      - ./vigileguard:/app/vigileguard:rw
+      - ./tests:/app/tests:rw
+      - ./scripts:/app/scripts:rw
+      - ./config.yaml:/app/config.yaml:rw
+      # Mount output directories
+      - ./reports:/app/reports:rw
+      - ./logs:/app/logs:rw
+      # Mount development tools config
+      - ./.git:/app/.git:ro
+      - ./pyproject.toml:/app/pyproject.toml:rw
+      - ./requirements.txt:/app/requirements.txt:rw
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+      - VIGILEGUARD_ENV=development
+      - TERM=xterm-256color
+    stdin_open: true
+    tty: true
+    networks:
+      - vigileguard-net
+    restart: unless-stopped
+    # Privileged mode for system-level security checks
+    privileged: false
+    # Add capabilities for network scanning
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits for development
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # Optional: Web interface for reports (if Phase 2 is available)
+  vigileguard-web:
+    image: nginx:alpine
+    container_name: vigileguard-web
+    volumes:
+      - ./reports:/usr/share/nginx/html/reports:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    networks:
+      - vigileguard-net
+    depends_on:
+      - vigileguard-dev
+    restart: unless-stopped
+    profiles:
+      - web
+
+  # Optional: Database for trend tracking (if needed)
+  vigileguard-db:
+    image: sqlite:latest
+    container_name: vigileguard-db
+    volumes:
+      - vigileguard-data:/data
+    environment:
+      - SQLITE_DATABASE=vigileguard.db
+    networks:
+      - vigileguard-net
+    profiles:
+      - database
+
+networks:
+  vigileguard-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  vigileguard-data:
+    driver: local
+
+# Development commands:
+# docker-compose -f docker-compose.dev.yml up -d
+# docker-compose -f docker-compose.dev.yml exec vigileguard-dev /bin/bash
+# docker-compose -f docker-compose.dev.yml logs -f vigileguard-dev
