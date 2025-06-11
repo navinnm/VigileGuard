@@ -15,77 +15,78 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-# Import base classes and types - avoid circular import by importing directly
+# Import base classes - handle both relative and absolute imports
+try:
+    from .vigileguard import SecurityChecker, SeverityLevel, Finding
+except ImportError:
+    try:
+        from vigileguard import SecurityChecker, SeverityLevel, Finding
+    except ImportError:
+        # Fallback - redefine classes if import fails
+        class SeverityLevel(Enum):
+            CRITICAL = "CRITICAL"
+            HIGH = "HIGH"
+            MEDIUM = "MEDIUM"
+            LOW = "LOW"
+            INFO = "INFO"
+
+        @dataclass
+        class Finding:
+            category: str
+            severity: SeverityLevel
+            title: str
+            description: str
+            recommendation: str
+            details: Optional[Dict[str, Any]] = None
+
+            def to_dict(self) -> Dict[str, Any]:
+                from dataclasses import asdict
+                result = asdict(self)
+                result["severity"] = self.severity.value
+                return result
+
+        class SecurityChecker:
+            def __init__(self):
+                self.findings: List[Finding] = []
+
+            def check(self) -> List[Finding]:
+                raise NotImplementedError
+
+            def add_finding(self, category: str, severity: SeverityLevel, title: str,
+                        description: str, recommendation: str, 
+                        details: Optional[Dict[str, Any]] = None):
+                finding = Finding(
+                    category=category,
+                    severity=severity,
+                    title=title,
+                    description=description,
+                    recommendation=recommendation,
+                    details=details or {}
+                )
+                self.findings.append(finding)
+
+            def run_command(self, command: str) -> tuple:
+                try:
+                    result = subprocess.run(
+                        command, shell=True, capture_output=True, text=True, timeout=30
+                    )
+                    return result.returncode, result.stdout, result.stderr
+                except subprocess.TimeoutExpired:
+                    return -1, "", "Command timed out"
+                except Exception as e:
+                    return -1, "", str(e)
+
+# Handle rich console gracefully
 try:
     from rich.console import Console
+    console = Console()
+    RICH_AVAILABLE = True
 except ImportError:
-    print("Error: rich library not installed. Install with: pip install rich")
-    exit(1)
-
-# Create console instance
-console = Console()
-
-# Re-define required classes to avoid circular imports
-class SeverityLevel(Enum):
-    """Security finding severity levels"""
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-    INFO = "INFO"
-
-@dataclass
-class Finding:
-    """Represents a security finding"""
-    category: str
-    severity: SeverityLevel
-    title: str
-    description: str
-    recommendation: str
-    details: Optional[Dict[str, Any]] = None  
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert finding to dictionary"""
-        from dataclasses import asdict
-        result = asdict(self)
-        result["severity"] = self.severity.value
-        return result
-
-class SecurityChecker:
-    """Base class for all security checkers"""
-
-    def __init__(self):
-        self.findings: List[Finding] = []
-
-    def check(self) -> List[Finding]:
-        """Run the security check - to be implemented by subclasses"""
-        raise NotImplementedError
-
-    def add_finding(self, category: str, severity: SeverityLevel, title: str,
-                description: str, recommendation: str, 
-                details: Optional[Dict[str, Any]] = None):
-        """Add a security finding"""
-        finding = Finding(
-            category=category,
-            severity=severity,
-            title=title,
-            description=description,
-            recommendation=recommendation,
-            details=details or {}
-        )
-        self.findings.append(finding)
-
-    def run_command(self, command: str) -> tuple:
-        """Execute a shell command and return output"""
-        try:
-            result = subprocess.run(
-                command, shell=True, capture_output=True, text=True, timeout=30
-            )
-            return result.returncode, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            return -1, "", "Command timed out"
-        except Exception as e:
-            return -1, "", str(e)
+    RICH_AVAILABLE = False
+    class Console:
+        def print(self, *args, **kwargs):
+            print(*args)
+    console = Console()
 
 
 class WebServerSecurityChecker(SecurityChecker):
@@ -93,7 +94,10 @@ class WebServerSecurityChecker(SecurityChecker):
     
     def check(self) -> List[Finding]:
         """Run web server security checks"""
-        console.print("🌐 Checking web server security...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("🌐 Checking web server security...", style="yellow")
+        else:
+            print("🌐 Checking web server security...")
         
         # Detect installed web servers
         self._detect_web_servers()
@@ -135,6 +139,15 @@ class WebServerSecurityChecker(SecurityChecker):
                 recommendation="Ensure all web servers are properly configured and secured",
                 details={"servers": servers_found}
             )
+        else:
+            self.add_finding(
+                category="Web Server",
+                severity=SeverityLevel.INFO,
+                title="No web servers detected",
+                description="No Apache or Nginx installations found",
+                recommendation="Consider this informational if web services are not needed",
+                details={}
+            )
     
     def _is_apache_installed(self) -> bool:
         """Check if Apache is installed"""
@@ -156,7 +169,10 @@ class WebServerSecurityChecker(SecurityChecker):
     
     def _check_apache_security(self):
         """Check Apache security configuration"""
-        console.print("🔍 Checking Apache configuration...", style="blue")
+        if RICH_AVAILABLE:
+            console.print("🔍 Checking Apache configuration...", style="blue")
+        else:
+            print("🔍 Checking Apache configuration...")
         
         # Check Apache configuration files
         config_paths = [
@@ -262,10 +278,10 @@ class WebServerSecurityChecker(SecurityChecker):
             "mod_userdir"
         ]
         
-        cmd = "apache2ctl -M 2>/dev/null || httpd -M 2>/dev/null"
+        cmd = "apache2ctl -M 2>/dev/null || httpd -M 2>/dev/null || echo 'apache not running'"
         returncode, stdout, stderr = self.run_command(cmd)
         
-        if returncode == 0:
+        if returncode == 0 and stdout and "apache not running" not in stdout:
             loaded_modules = stdout.lower()
             found_dangerous = []
             
@@ -285,13 +301,22 @@ class WebServerSecurityChecker(SecurityChecker):
     
     def _check_apache_version(self):
         """Check Apache version for known vulnerabilities"""
-        cmd = "apache2 -v 2>/dev/null || httpd -v 2>/dev/null"
+        cmd = "apache2 -v 2>/dev/null || httpd -v 2>/dev/null || echo 'version not found'"
         returncode, stdout, stderr = self.run_command(cmd)
         
-        if returncode == 0:
+        if returncode == 0 and stdout and "version not found" not in stdout:
             version_match = re.search(r'Apache/(\d+\.\d+\.\d+)', stdout)
             if version_match:
                 version = version_match.group(1)
+                
+                self.add_finding(
+                    category="Web Server",
+                    severity=SeverityLevel.INFO,
+                    title="Apache version detected",
+                    description=f"Apache version {version} detected",
+                    recommendation="Keep Apache updated to the latest stable version",
+                    details={"version": version}
+                )
                 
                 # Check for known vulnerable versions (simplified check)
                 vulnerable_versions = ["2.4.41", "2.4.29", "2.4.28"]
@@ -307,7 +332,10 @@ class WebServerSecurityChecker(SecurityChecker):
     
     def _check_nginx_security(self):
         """Check Nginx security configuration"""
-        console.print("🔍 Checking Nginx configuration...", style="blue")
+        if RICH_AVAILABLE:
+            console.print("🔍 Checking Nginx configuration...", style="blue")
+        else:
+            print("🔍 Checking Nginx configuration...")
         
         # Check Nginx configuration files
         config_paths = [
@@ -384,26 +412,36 @@ class WebServerSecurityChecker(SecurityChecker):
     
     def _check_nginx_version(self):
         """Check Nginx version for known vulnerabilities"""
-        cmd = "nginx -v 2>&1"
+        cmd = "nginx -v 2>&1 || echo 'nginx not found'"
         returncode, stdout, stderr = self.run_command(cmd)
         
         if returncode == 0:
             output = stdout + stderr
-            version_match = re.search(r'nginx/(\d+\.\d+\.\d+)', output)
-            if version_match:
-                version = version_match.group(1)
-                
-                # Check for known vulnerable versions (simplified check)
-                vulnerable_versions = ["1.18.0", "1.16.1", "1.14.2"]
-                if version in vulnerable_versions:
+            if "nginx not found" not in output:
+                version_match = re.search(r'nginx/(\d+\.\d+\.\d+)', output)
+                if version_match:
+                    version = version_match.group(1)
+                    
                     self.add_finding(
                         category="Web Server",
-                        severity=SeverityLevel.HIGH,
-                        title="Nginx version has known vulnerabilities",
-                        description=f"Nginx version {version} has known security vulnerabilities",
-                        recommendation="Update Nginx to the latest stable version",
+                        severity=SeverityLevel.INFO,
+                        title="Nginx version detected",
+                        description=f"Nginx version {version} detected",
+                        recommendation="Keep Nginx updated to the latest stable version",
                         details={"version": version}
                     )
+                    
+                    # Check for known vulnerable versions (simplified check)
+                    vulnerable_versions = ["1.18.0", "1.16.1", "1.14.2"]
+                    if version in vulnerable_versions:
+                        self.add_finding(
+                            category="Web Server",
+                            severity=SeverityLevel.HIGH,
+                            title="Nginx version has known vulnerabilities",
+                            description=f"Nginx version {version} has known security vulnerabilities",
+                            recommendation="Update Nginx to the latest stable version",
+                            details={"version": version}
+                        )
     
     def _check_ssl_tls_config(self):
         """Check SSL/TLS configuration"""
@@ -426,6 +464,14 @@ class WebServerSecurityChecker(SecurityChecker):
                     pass
         
         if cert_files:
+            self.add_finding(
+                category="SSL/TLS",
+                severity=SeverityLevel.INFO,
+                title="SSL certificates found",
+                description=f"Found {len(cert_files)} SSL certificate files",
+                recommendation="Ensure SSL certificates are properly configured and up to date",
+                details={"certificate_count": len(cert_files)}
+            )
             self._analyze_ssl_certificates(cert_files)
         
         # Check for weak SSL ciphers in configuration
@@ -435,10 +481,10 @@ class WebServerSecurityChecker(SecurityChecker):
         """Analyze SSL certificates"""
         for cert_file in cert_files[:5]:  # Limit to first 5 certificates
             try:
-                cmd = f"openssl x509 -in {cert_file} -text -noout"
+                cmd = f"openssl x509 -in {cert_file} -text -noout 2>/dev/null"
                 returncode, stdout, stderr = self.run_command(cmd)
                 
-                if returncode == 0:
+                if returncode == 0 and stdout:
                     # Check for weak signature algorithms
                     if "sha1WithRSAEncryption" in stdout:
                         self.add_finding(
@@ -547,8 +593,6 @@ class WebServerSecurityChecker(SecurityChecker):
             if os.path.exists(root):
                 document_roots.append(root)
         
-        # TODO: Parse actual document roots from config files
-        
         return document_roots
 
 
@@ -557,7 +601,10 @@ class NetworkSecurityChecker(SecurityChecker):
     
     def check(self) -> List[Finding]:
         """Run network security checks"""
-        console.print("🌐 Checking network security...", style="yellow")
+        if RICH_AVAILABLE:
+            console.print("🌐 Checking network security...", style="yellow")
+        else:
+            print("🌐 Checking network security...")
         
         # Check firewall configuration
         self._check_firewall_config()
@@ -576,10 +623,10 @@ class NetworkSecurityChecker(SecurityChecker):
     def _check_firewall_config(self):
         """Check firewall configuration"""
         # Check UFW status
-        cmd = "ufw status"
+        cmd = "ufw status 2>/dev/null || echo 'ufw not found'"
         returncode, stdout, stderr = self.run_command(cmd)
         
-        if returncode == 0:
+        if returncode == 0 and "ufw not found" not in stdout:
             if "Status: inactive" in stdout:
                 self.add_finding(
                     category="Network Security",
@@ -593,10 +640,10 @@ class NetworkSecurityChecker(SecurityChecker):
                 self._analyze_ufw_rules(stdout)
         
         # Check iptables if UFW not available
-        cmd = "iptables -L"
+        cmd = "iptables -L 2>/dev/null || echo 'iptables not accessible'"
         returncode, stdout, stderr = self.run_command(cmd)
         
-        if returncode == 0:
+        if returncode == 0 and "iptables not accessible" not in stdout:
             self._analyze_iptables_rules(stdout)
     
     def _analyze_ufw_rules(self, ufw_output: str):
@@ -646,11 +693,20 @@ class NetworkSecurityChecker(SecurityChecker):
     def _check_open_ports(self):
         """Check for unnecessary open ports"""
         # Use netstat to check listening ports
-        cmd = "netstat -tlnp 2>/dev/null || ss -tlnp"
+        cmd = "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null || echo 'no network tools found'"
         returncode, stdout, stderr = self.run_command(cmd)
         
-        if returncode == 0:
+        if returncode == 0 and "no network tools found" not in stdout:
             self._analyze_listening_ports(stdout)
+        else:
+            self.add_finding(
+                category="Network Security",
+                severity=SeverityLevel.INFO,
+                title="Cannot check open ports",
+                description="Network monitoring tools (netstat/ss) not available or accessible",
+                recommendation="Install net-tools package or run with appropriate privileges",
+                details={}
+            )
     
     def _analyze_listening_ports(self, port_output: str):
         """Analyze listening ports for security issues"""
@@ -718,6 +774,17 @@ class NetworkSecurityChecker(SecurityChecker):
                 recommendation="Review and close unnecessary network services",
                 details={"port_count": len(all_ports)}
             )
+        
+        # Add informational finding about detected ports
+        if all_ports:
+            self.add_finding(
+                category="Network Security",
+                severity=SeverityLevel.INFO,
+                title="Network ports detected",
+                description=f"Found {len(all_ports)} listening network ports",
+                recommendation="Review that all listening services are necessary and properly secured",
+                details={"listening_ports": all_ports[:20]}  # Limit to first 20
+            )
     
     def _check_network_services(self):
         """Check for risky network services"""
@@ -732,10 +799,10 @@ class NetworkSecurityChecker(SecurityChecker):
         active_risky = []
         
         for service in risky_services:
-            cmd = f"systemctl is-active {service} 2>/dev/null"
+            cmd = f"systemctl is-active {service} 2>/dev/null || echo 'inactive'"
             returncode, stdout, stderr = self.run_command(cmd)
             
-            if returncode == 0 and "active" in stdout:
+            if returncode == 0 and "active" in stdout and "inactive" not in stdout:
                 active_risky.append(service)
         
         if active_risky:
@@ -757,9 +824,18 @@ class NetworkSecurityChecker(SecurityChecker):
                 with open(resolv_conf, 'r') as f:
                     content = f.read()
                 
-                # Check for insecure DNS servers
-                insecure_dns = ["8.8.8.8", "1.1.1.1"]  # Actually secure, but as example
+                # Check for DNS servers
                 dns_servers = re.findall(r'nameserver\s+(\S+)', content)
+                
+                if dns_servers:
+                    self.add_finding(
+                        category="Network Security",
+                        severity=SeverityLevel.INFO,
+                        title="DNS configuration detected",
+                        description=f"Found {len(dns_servers)} DNS servers configured",
+                        recommendation="Ensure DNS servers are trustworthy and properly secured",
+                        details={"dns_servers": dns_servers}
+                    )
                 
                 # Check if using localhost DNS (potential DNS spoofing)
                 if any(dns in ["127.0.0.1", "::1"] for dns in dns_servers):
@@ -773,4 +849,10 @@ class NetworkSecurityChecker(SecurityChecker):
                     )
                         
             except (OSError, PermissionError):
-                pass
+                self.add_finding(
+                    category="Network Security",
+                    severity=SeverityLevel.INFO,
+                    title="Cannot read DNS configuration",
+                    description="Insufficient permissions to read /etc/resolv.conf",
+                    recommendation="Run VigileGuard with appropriate privileges to check DNS configuration"
+                )
