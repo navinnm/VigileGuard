@@ -23,6 +23,7 @@ from datetime import datetime as dt
 from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
 
 # Add current directory to Python path to help with imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -908,6 +909,7 @@ class UserAccountChecker(SecurityChecker):
         self._assess_identity_correlation()
         
         return self.findings
+    
     
     def _analyze_account_inventory(self):
         """Comprehensive account inventory and risk profiling"""
