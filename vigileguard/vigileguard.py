@@ -909,161 +909,163 @@ class UserAccountChecker(SecurityChecker):
         self._assess_identity_correlation()
         
         return self.findings
-    
-        # Add these methods to the UserAccountChecker class
 
-        def _get_nist_requirements(self) -> Dict:
-            """NIST requirements for user accounts"""
-            return {
-                'password_policy': {
-                    'min_length': 8,
-                    'complexity': True,
-                    'history': 24,
-                    'max_age': 60
-                },
-                'account_lockout': {
-                    'enabled': True,
-                    'threshold': 3,
-                    'duration': 1800
-                }
+    # Add these missing methods to the UserAccountChecker class
+
+    def _get_nist_requirements(self) -> Dict:
+        """NIST requirements for user accounts"""
+        return {
+            'password_policy': {
+                'min_length': 8,
+                'complexity': True,
+                'history': 24,
+                'max_age': 60
+            },
+            'account_lockout': {
+                'enabled': True,
+                'threshold': 3,
+                'duration': 1800
             }
+        }
 
-        def _get_pci_requirements(self) -> Dict:
-            """PCI DSS requirements for user accounts"""
-            return {
-                'password_policy': {
-                    'min_length': 7,
-                    'complexity': True,
-                    'history': 4,
-                    'max_age': 90
-                },
-                'mfa_required': True
-            }
+    def _get_pci_requirements(self) -> Dict:
+        """PCI DSS requirements for user accounts"""
+        return {
+            'password_policy': {
+                'min_length': 7,
+                'complexity': True,
+                'history': 4,
+                'max_age': 90
+            },
+            'mfa_required': True
+        }
 
-        def _get_sox_requirements(self) -> Dict:
-            """SOX requirements for user accounts"""
-            return {
-                'access_reviews': True,
-                'segregation_of_duties': True,
-                'audit_logging': True
-            }
+    def _get_sox_requirements(self) -> Dict:
+        """SOX requirements for user accounts"""
+        return {
+            'access_reviews': True,
+            'segregation_of_duties': True,
+            'audit_logging': True
+        }
 
-        def _classify_account_type(self, user) -> str:
-            """Classify account type"""
-            if user.pw_uid < 1000:
-                return "system"
-            elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
-                return "service"
-            else:
-                return "user"
+    def _classify_account_type(self, user) -> str:
+        """Classify account type"""
+        if user.pw_uid < 1000:
+            return "system"
+        elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
+            return "service"
+        else:
+            return "user"
 
-        def _assess_privilege_level(self, user) -> 'PrivilegeLevel':
-            """Assess privilege level of user"""
-            if user.pw_uid == 0:
-                return PrivilegeLevel.ADMIN
-            elif user.pw_uid < 1000:
-                return PrivilegeLevel.SYSTEM
-            elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
-                return PrivilegeLevel.SERVICE
-            else:
-                return PrivilegeLevel.USER
+    def _assess_privilege_level(self, user) -> 'PrivilegeLevel':
+        """Assess privilege level of user"""
+        if user.pw_uid == 0:
+            return PrivilegeLevel.ADMIN
+        elif user.pw_uid < 1000:
+            return PrivilegeLevel.SYSTEM
+        elif user.pw_shell in ['/bin/false', '/usr/sbin/nologin']:
+            return PrivilegeLevel.SERVICE
+        else:
+            return PrivilegeLevel.USER
 
-        def _calculate_password_age(self, shadow_entry) -> int:
-            """Calculate password age in days"""
-            try:
-                if shadow_entry.sp_lstchg and shadow_entry.sp_lstchg > 0:
-                    last_change = dt.fromtimestamp(shadow_entry.sp_lstchg * 86400)
-                    return (dt.now() - last_change).days
-            except (ValueError, TypeError):
-                pass
-            return -1
-
-        def _get_last_login(self, username: str) -> Optional[datetime.datetime]:
-            """Get last login time for user"""
-            try:
-                cmd = f"lastlog -u {username} 2>/dev/null | tail -1"
-                returncode, stdout, stderr = self.run_command(cmd)
-                if returncode == 0 and "Never logged in" not in stdout:
-                    # This is a simplified parser - real implementation would be more robust
-                    return dt.now()  # Placeholder
-            except Exception:
-                pass
-            return None
-
-        def _get_failed_login_count(self, username: str) -> int:
-            """Get failed login count for user"""
-            try:
-                cmd = f"faillog -u {username} 2>/dev/null | grep -v 'Failures' | wc -l"
-                returncode, stdout, stderr = self.run_command(cmd)
-                if returncode == 0:
-                    return int(stdout.strip()) if stdout.strip().isdigit() else 0
-            except Exception:
-                pass
-            return 0
-
-        def _analyze_account_distribution(self, accounts: List['AccountRiskProfile']):
-            """Analyze account distribution"""
-            # Placeholder - implement account distribution analysis
+    def _calculate_password_age(self, shadow_entry) -> int:
+        """Calculate password age in days"""
+        try:
+            if shadow_entry.sp_lstchg and shadow_entry.sp_lstchg > 0:
+                last_change = dt.fromtimestamp(shadow_entry.sp_lstchg * 86400)
+                return (dt.now() - last_change).days
+        except (ValueError, TypeError):
             pass
+        return -1
 
-        def _identify_dormant_accounts(self, accounts: List['AccountRiskProfile']):
-            """Identify dormant accounts"""
-            dormant_accounts = []
-            for account in accounts:
-                if not account.last_login or (dt.now() - account.last_login).days > 90:
-                    dormant_accounts.append(account.username)
-            
-            if dormant_accounts:
-                self.add_finding(
-                    category="Account Management",
-                    severity=SeverityLevel.MEDIUM,
-                    title="Dormant Accounts Detected",
-                    description=f"Found {len(dormant_accounts)} accounts that haven't been used in 90+ days",
-                    recommendation="Review and disable/remove dormant accounts",
-                    details={"dormant_accounts": dormant_accounts}
-                )
-
-        def _analyze_privileged_accounts(self, accounts: List['AccountRiskProfile']):
-            """Analyze privileged accounts"""
-            privileged_accounts = [acc for acc in accounts if acc.privilege_level in ['admin', 'system']]
-            if len(privileged_accounts) > 5:  # Arbitrary threshold
-                self.add_finding(
-                    category="Privilege Management",
-                    severity=SeverityLevel.MEDIUM,
-                    title="High Number of Privileged Accounts",
-                    description=f"Found {len(privileged_accounts)} privileged accounts",
-                    recommendation="Review privileged account necessity and implement least privilege",
-                    details={"privileged_count": len(privileged_accounts)}
-                )
-
-        def _analyze_pam_configuration(self):
-            """Analyze PAM configuration"""
-            # Placeholder implementation
+    def _get_last_login(self, username: str) -> Optional[datetime.datetime]:
+        """Get last login time for user"""
+        try:
+            cmd = f"lastlog -u {username} 2>/dev/null | tail -1"
+            returncode, stdout, stderr = self.run_command(cmd)
+            if returncode == 0 and "Never logged in" not in stdout:
+                # This is a simplified parser - real implementation would be more robust
+                return dt.now()  # Placeholder
+        except Exception:
             pass
+        return None
 
-        def _verify_authentication_logging(self):
-            """Verify authentication logging is enabled"""
-            # Placeholder implementation
+    def _get_failed_login_count(self, username: str) -> int:
+        """Get failed login count for user"""
+        try:
+            cmd = f"faillog -u {username} 2>/dev/null | grep -v 'Failures' | wc -l"
+            returncode, stdout, stderr = self.run_command(cmd)
+            if returncode == 0:
+                return int(stdout.strip()) if stdout.strip().isdigit() else 0
+        except Exception:
             pass
+        return 0
 
-        def _audit_suid_sgid_binaries(self):
-            """Audit SUID/SGID binaries"""
-            # Placeholder implementation
-            pass
+    def _analyze_account_distribution(self, accounts: List['AccountRiskProfile']):
+        """Analyze account distribution"""
+        # Placeholder - implement account distribution analysis
+        pass
 
-        def _audit_dangerous_group_memberships(self):
-            """Audit dangerous group memberships"""
-            # Placeholder implementation
-            pass
+    def _identify_dormant_accounts(self, accounts: List['AccountRiskProfile']):
+        """Identify dormant accounts"""
+        dormant_accounts = []
+        for account in accounts:
+            if not account.last_login or (dt.now() - account.last_login).days > 90:
+                dormant_accounts.append(account.username)
+        
+        if dormant_accounts:
+            self.add_finding(
+                category="Account Management",
+                severity=SeverityLevel.MEDIUM,
+                title="Dormant Accounts Detected",
+                description=f"Found {len(dormant_accounts)} accounts that haven't been used in 90+ days",
+                recommendation="Review and disable/remove dormant accounts",
+                details={"dormant_accounts": dormant_accounts}
+            )
 
-        def _identify_escalation_vectors(self) -> List[str]:
-            """Identify privilege escalation vectors"""
-            # Placeholder implementation
-            return []
+    def _analyze_privileged_accounts(self, accounts: List['AccountRiskProfile']):
+        """Analyze privileged accounts"""
+        privileged_accounts = [acc for acc in accounts if acc.privilege_level in ['admin', 'system']]
+        if len(privileged_accounts) > 5:  # Arbitrary threshold
+            self.add_finding(
+                category="Privilege Management",
+                severity=SeverityLevel.MEDIUM,
+                title="High Number of Privileged Accounts",
+                description=f"Found {len(privileged_accounts)} privileged accounts",
+                recommendation="Review privileged account necessity and implement least privilege",
+                details={"privileged_count": len(privileged_accounts)}
+            )
 
-        def _analyze_lockout_configuration(self) -> Dict:
-            """Analyze account lockout configuration"""
-            return {"enabled": False}
+    def _analyze_pam_configuration(self):
+        """Analyze PAM configuration"""
+        # Placeholder implementation
+        pass
+
+    def _verify_authentication_logging(self):
+        """Verify authentication logging is enabled"""
+        # Placeholder implementation
+        pass
+
+    def _audit_suid_sgid_binaries(self):
+        """Audit SUID/SGID binaries"""
+        # Placeholder implementation
+        pass
+
+    def _audit_dangerous_group_memberships(self):
+        """Audit dangerous group memberships"""
+        # Placeholder implementation
+        pass
+
+    def _identify_escalation_vectors(self) -> List[str]:
+        """Identify privilege escalation vectors"""
+        # Placeholder implementation
+        return []
+
+    def _analyze_lockout_configuration(self) -> Dict:
+        """Analyze account lockout configuration"""
+        return {"enabled": False}
+
+   
 
         def _get_locked_accounts(self) -> List[str]:
             """Get list of locked accounts"""
