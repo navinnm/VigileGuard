@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Script configuration
 SCRIPT_NAME="VigileGuard Installer"
-VERSION="2.0.0"
+VERSION="1.0.6"
 REPO_URL="https://github.com/navinnm/VigileGuard"
 PYTHON_MIN_VERSION="3.8"
 

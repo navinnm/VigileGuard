@@ -105,6 +105,6 @@ CMD ["echo 'VigileGuard Development Environment' && echo 'Available commands:' &
 # Add development labels
 LABEL org.opencontainers.image.title="VigileGuard Development" \
       org.opencontainers.image.description="VigileGuard Development Environment" \
-      org.opencontainers.image.version="2.0.0-dev" \
+      org.opencontainers.image.version="1.0.6-dev" \
       org.opencontainers.image.source="https://github.com/navinnm/VigileGuard" \
       environment="development"

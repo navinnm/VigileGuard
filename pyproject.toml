@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vigileguard"
-version = "2.0.0"
+version = "1.0.6"
 description = "Comprehensive Linux Security Audit Tool with Phase 1 & 2 Features"
 readme = "README.md"
 # Fixed: Use SPDX license identifier instead of deprecated license field

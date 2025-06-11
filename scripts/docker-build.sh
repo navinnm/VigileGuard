@@ -28,7 +28,7 @@ print_error() {
 
 # Configuration
 IMAGE_NAME="vigileguard"
-VERSION=$(python -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "2.0.0")
+VERSION=$(python -c "import vigileguard; print(vigileguard.__version__)" 2>/dev/null || echo "1.0.6")
 BUILD_PRODUCTION=true
 BUILD_DEVELOPMENT=false
 PUSH_TO_REGISTRY=false

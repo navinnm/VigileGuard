@@ -17,36 +17,48 @@ from pathlib import Path
 from datetime import datetime
 import logging
 
-# Import base classes to avoid circular imports
-from enum import Enum
-from dataclasses import dataclass, asdict
+# Handle imports gracefully - support both relative and absolute imports
+try:
+    from .vigileguard import SeverityLevel, Finding, SecurityChecker, AuditEngine
+except ImportError:
+    try:
+        from vigileguard import SeverityLevel, Finding, SecurityChecker, AuditEngine
+    except ImportError:
+        # Fallback - redefine classes if import fails
+        from enum import Enum
+        from dataclasses import dataclass, asdict
+        
+        class SeverityLevel(Enum):
+            CRITICAL = "CRITICAL"
+            HIGH = "HIGH"
+            MEDIUM = "MEDIUM"
+            LOW = "LOW"
+            INFO = "INFO"
 
-# Re-define core classes to avoid circular imports
-class SeverityLevel(Enum):
-    """Security finding severity levels"""
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-    INFO = "INFO"
+        @dataclass
+        class Finding:
+            category: str
+            severity: SeverityLevel
+            title: str
+            description: str
+            recommendation: str
+            details: Optional[Dict[str, Any]] = None
 
-@dataclass
-class Finding:
-    """Represents a security finding"""
-    category: str
-    severity: SeverityLevel
-    title: str
-    description: str
-    recommendation: str
-    details: Optional[Dict[str, Any]] = None  
+            def to_dict(self) -> Dict[str, Any]:
+                result = asdict(self)
+                result["severity"] = self.severity.value
+                return result
+        
+        class SecurityChecker:
+            def __init__(self):
+                self.findings: List[Finding] = []
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert finding to dictionary"""
-        result = asdict(self)
-        result["severity"] = self.severity.value
-        return result
+        class AuditEngine:
+            def __init__(self, config_path=None):
+                self.config_path = config_path
+                self.all_findings = []
 
-# Create a simple console that works with or without rich
+# Handle rich console gracefully
 try:
     from rich.console import Console
     from rich.panel import Panel
@@ -80,13 +92,13 @@ class ConfigurationManager:
             os.environ.get('VIGILEGUARD_CONFIG'),
             './config.yaml',
             './vigileguard.yaml',
-            '~/.config/vigileguard/config.yaml',
+            os.path.expanduser('~/.config/vigileguard/config.yaml'),
             '/etc/vigileguard/config.yaml'
         ]
         
         for path in search_paths:
-            if path and os.path.exists(os.path.expanduser(path)):
-                return os.path.expanduser(path)
+            if path and os.path.exists(path):
+                return path
         
         # Return default path for creation
         return './config.yaml'
@@ -112,9 +124,60 @@ class ConfigurationManager:
             # Notification configuration (disabled by default)
             "notifications": {
                 "enabled": False,
-                "email": {"enabled": False},
-                "slack": {"enabled": False},
-                "webhook": {"enabled": False}
+                "channels": [],
+                "severity_threshold": "HIGH",
+                "email": {
+                    "enabled": False,
+                    "smtp_server": "",
+                    "smtp_port": 587,
+                    "username": "",
+                    "password": "",
+                    "from_address": "",
+                    "to_addresses": [],
+                    "use_tls": True
+                },
+                "slack": {
+                    "enabled": False,
+                    "webhook_url": "",
+                    "channel": "#security",
+                    "username": "VigileGuard"
+                },
+                "webhook": {
+                    "enabled": False,
+                    "url": "",
+                    "method": "POST",
+                    "headers": {"Content-Type": "application/json"},
+                    "timeout": 30
+                }
+            },
+            
+            # Environment-specific settings
+            "environments": {
+                "development": {
+                    "severity_filter": "MEDIUM",
+                    "notifications": {"enabled": False}
+                },
+                "staging": {
+                    "severity_filter": "HIGH",
+                    "notifications": {"enabled": True}
+                },
+                "production": {
+                    "severity_filter": "INFO",
+                    "notifications": {"enabled": True}
+                }
+            },
+            
+            # Scheduling configuration
+            "scheduling": {
+                "daily_scan": {
+                    "enabled": False,
+                    "time": "02:00"
+                },
+                "weekly_scan": {
+                    "enabled": False,
+                    "day": 0,
+                    "time": "03:00"
+                }
             }
         }
         
@@ -122,11 +185,12 @@ class ConfigurationManager:
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, 'r') as f:
-                    custom_config = yaml.safe_load(f)
-                if custom_config:
-                    # Merge with defaults, preserving existing structure
-                    for key, value in custom_config.items():
-                        default_config[key] = value
+                    content = f.read().strip()
+                    if content:
+                        custom_config = yaml.safe_load(content)
+                        if custom_config and isinstance(custom_config, dict):
+                            # Deep merge with defaults
+                            default_config = self._deep_merge(default_config, custom_config)
             except Exception as e:
                 if RICH_AVAILABLE:
                     console.print(f"Warning: Error loading config: {e}", style="yellow")
@@ -147,11 +211,13 @@ class ConfigurationManager:
     
     def _setup_logging(self):
         """Setup logging based on configuration"""
-        log_level = self.config.get('logging', {}).get('level', 'INFO')
-        log_file = self.config.get('logging', {}).get('file', 'vigileguard.log')
+        log_config = self.config.get('logging', {})
+        log_level = log_config.get('level', 'INFO')
+        log_file = log_config.get('file', 'vigileguard.log')
         
+        # Configure logging
         logging.basicConfig(
-            level=getattr(logging, log_level.upper()),
+            level=getattr(logging, log_level.upper(), logging.INFO),
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
                 logging.FileHandler(log_file),
@@ -178,24 +244,28 @@ class ConfigurationManager:
         issues = []
         
         # Check notification configuration
-        if self.config['notifications']['enabled']:
-            if 'email' in self.config['notifications']['channels']:
-                email_config = self.config['notifications']['email']
-                if not email_config['to_addresses']:
+        notifications = self.config.get('notifications', {})
+        if notifications.get('enabled', False):
+            channels = notifications.get('channels', [])
+            
+            if 'email' in channels:
+                email_config = notifications.get('email', {})
+                if not email_config.get('to_addresses'):
                     issues.append("Email notifications enabled but no recipients configured")
-                if not email_config['smtp_server']:
+                if not email_config.get('smtp_server'):
                     issues.append("Email notifications enabled but no SMTP server configured")
             
-            if 'webhook' in self.config['notifications']['channels']:
-                webhook_config = self.config['notifications']['webhook']
-                if not webhook_config['url']:
-                    issues.append("Webhook notifications enabled but no URL configured")
-        
-        # Check web server paths
-        for server, config in self.config['web_servers'].items():
-            for path in config['config_paths']:
-                if not os.path.exists(path):
-                    issues.append(f"{server} configuration path does not exist: {path}")
+            if 'webhook' in channels:
+                webhook_config = notifications.get('webhook', {})
+                webhook_url = webhook_config.get('url', '')
+                if not webhook_url or not webhook_url.startswith(('http://', 'https://')):
+                    issues.append("Webhook notifications enabled but no valid URL configured")
+            
+            if 'slack' in channels:
+                slack_config = notifications.get('slack', {})
+                slack_url = slack_config.get('webhook_url', '')
+                if not slack_url or not slack_url.startswith(('http://', 'https://')):
+                    issues.append("Slack notifications enabled but no valid webhook URL configured")
         
         return issues
     
@@ -248,35 +318,46 @@ class NotificationManager:
         for channel in channels:
             try:
                 if channel == 'email':
-                    # Check if email is properly configured
                     email_config = self.notification_config.get('email', {})
-                    if (email_config.get('smtp_server') and 
-                        email_config.get('to_addresses') and 
-                        email_config.get('from_address')):
+                    if self._is_email_configured(email_config):
                         self._send_email_notification(findings, scan_info)
                     else:
-                        self.logger.debug("Email notification skipped - not configured")
+                        self.logger.debug("Email notification skipped - not properly configured")
                         
                 elif channel == 'webhook':
-                    # Check if webhook is properly configured
                     webhook_config = self.notification_config.get('webhook', {})
-                    if webhook_config.get('url') and webhook_config['url'].startswith(('http://', 'https://')):
+                    if self._is_webhook_configured(webhook_config):
                         self._send_webhook_notification(findings, scan_info)
                     else:
-                        self.logger.debug("Webhook notification skipped - not configured")
+                        self.logger.debug("Webhook notification skipped - not properly configured")
                         
                 elif channel == 'slack':
-                    # Check if Slack is properly configured
                     slack_config = self.notification_config.get('slack', {})
-                    if slack_config.get('webhook_url') and slack_config['webhook_url'].startswith(('http://', 'https://')):
+                    if self._is_slack_configured(slack_config):
                         self._send_slack_notification(findings, scan_info)
                     else:
-                        self.logger.debug("Slack notification skipped - not configured")
+                        self.logger.debug("Slack notification skipped - not properly configured")
                         
                 else:
                     self.logger.warning(f"Unknown notification channel: {channel}")
             except Exception as e:
                 self.logger.error(f"Failed to send {channel} notification: {e}")
+    
+    def _is_email_configured(self, email_config: Dict[str, Any]) -> bool:
+        """Check if email is properly configured"""
+        return (email_config.get('smtp_server') and 
+                email_config.get('to_addresses') and 
+                email_config.get('from_address'))
+    
+    def _is_webhook_configured(self, webhook_config: Dict[str, Any]) -> bool:
+        """Check if webhook is properly configured"""
+        url = webhook_config.get('url', '')
+        return url and url.startswith(('http://', 'https://'))
+    
+    def _is_slack_configured(self, slack_config: Dict[str, Any]) -> bool:
+        """Check if Slack is properly configured"""
+        url = slack_config.get('webhook_url', '')
+        return url and url.startswith(('http://', 'https://'))
     
     def _send_email_notification(self, findings: List[Finding], scan_info: Dict[str, Any]):
         """Send email notification"""
@@ -295,20 +376,18 @@ class NotificationManager:
         msg.attach(MIMEText(body, 'html'))
         
         # Send email
-        smtp_server = smtplib.SMTP(email_config['smtp_server'], email_config['smtp_port'])
-        
-        if email_config.get('use_tls', True):
-            smtp_server.starttls()
-        
-        if email_config.get('username') and email_config.get('password'):
-            smtp_server.login(email_config['username'], email_config['password'])
-        
-        smtp_server.sendmail(
-            email_config['from_address'],
-            email_config['to_addresses'],
-            msg.as_string()
-        )
-        smtp_server.quit()
+        with smtplib.SMTP(email_config['smtp_server'], email_config.get('smtp_port', 587)) as server:
+            if email_config.get('use_tls', True):
+                server.starttls()
+            
+            if email_config.get('username') and email_config.get('password'):
+                server.login(email_config['username'], email_config['password'])
+            
+            server.sendmail(
+                email_config['from_address'],
+                email_config['to_addresses'],
+                msg.as_string()
+            )
         
         self.logger.info(f"Email notification sent to {len(email_config['to_addresses'])} recipients")
     
@@ -598,7 +677,7 @@ class SchedulingManager:
         """Setup daily security scan"""
         # Get the current script path
         script_path = os.path.abspath(__file__)
-        command = f"{script_path} --format json --output /var/log/vigileguard/daily-$(date +\\%Y\\%m\\%d).json"
+        command = f"python3 {script_path} --format json --output /var/log/vigileguard/daily-$(date +\\%Y\\%m\\%d).json"
         
         hour, minute = time.split(':')
         schedule = f"{minute} {hour} * * *"
@@ -608,7 +687,7 @@ class SchedulingManager:
     def setup_weekly_scan(self, day: int = 0, time: str = "03:00") -> bool:
         """Setup weekly security scan (0=Sunday, 6=Saturday)"""
         script_path = os.path.abspath(__file__)
-        command = f"{script_path} --format json --output /var/log/vigileguard/weekly-$(date +\\%Y\\%m\\%d).json"
+        command = f"python3 {script_path} --format json --output /var/log/vigileguard/weekly-$(date +\\%Y\\%m\\%d).json"
         
         hour, minute = time.split(':')
         schedule = f"{minute} {hour} * * {day}"
@@ -626,72 +705,20 @@ class Phase2AuditEngine:
         self.config_manager = ConfigurationManager(config_path)
         self.config = self.config_manager.get_environment_config(environment)
         
-        # Initialize notification manager with adapted config
-        notification_config = self._adapt_notification_config()
-        self.notification_manager = NotificationManager(notification_config)
-        self.webhook_integration = WebhookIntegration(notification_config)
+        # Initialize notification manager
+        self.notification_manager = NotificationManager(self.config)
+        self.webhook_integration = WebhookIntegration(self.config)
         self.scheduling_manager = SchedulingManager(self.config)
         
         # Initialize checkers (Phase 1 + Phase 2)
         self.checkers = self._initialize_checkers()
         self.all_findings: List[Finding] = []
     
-    def _adapt_notification_config(self) -> Dict[str, Any]:
-        """Adapt existing config format to Phase 2 notification format"""
-        original_notifications = self.config.get('notifications', {})
-        
-        # Convert to Phase 2 format
-        adapted_config = {
-            'notifications': {
-                'enabled': False,  # Default to disabled to prevent errors
-                'channels': [],
-                'severity_threshold': 'HIGH',
-                'email': {
-                    'smtp_server': original_notifications.get('email', {}).get('smtp_server', ''),
-                    'smtp_port': original_notifications.get('email', {}).get('smtp_port', 587),
-                    'username': original_notifications.get('email', {}).get('username', ''),
-                    'password': original_notifications.get('email', {}).get('password', ''),
-                    'from_address': original_notifications.get('email', {}).get('username', ''),
-                    'to_addresses': original_notifications.get('email', {}).get('recipients', []),
-                    'use_tls': True
-                },
-                'webhook': {
-                    'url': original_notifications.get('webhook', {}).get('url', ''),
-                    'method': 'POST',
-                    'headers': {'Content-Type': 'application/json'},
-                    'timeout': 30
-                },
-                'slack': {
-                    'webhook_url': original_notifications.get('slack', {}).get('webhook_url', ''),
-                    'channel': original_notifications.get('slack', {}).get('channel', '#security'),
-                    'username': 'VigileGuard'
-                }
-            }
-        }
-        
-        # Enable notifications if any are configured
-        email_enabled = original_notifications.get('email', {}).get('enabled', False)
-        slack_enabled = original_notifications.get('slack', {}).get('enabled', False)
-        webhook_enabled = original_notifications.get('webhook', {}).get('enabled', False)
-        
-        if email_enabled or slack_enabled or webhook_enabled:
-            adapted_config['notifications']['enabled'] = True
-            channels = []
-            if email_enabled:
-                channels.append('email')
-            if slack_enabled:
-                channels.append('slack')
-            if webhook_enabled:
-                channels.append('webhook')
-            adapted_config['notifications']['channels'] = channels
-        
-        return adapted_config
-    
-    def _initialize_checkers(self) -> List:
+    def _initialize_checkers(self) -> List[SecurityChecker]:
         """Initialize all security checkers"""
         checkers = []
         
-        # Phase 1 checkers (import from vigileguard.py)
+        # Phase 1 checkers
         try:
             from vigileguard import FilePermissionChecker, UserAccountChecker, SSHConfigChecker, SystemInfoChecker
             checkers.extend([
@@ -722,8 +749,8 @@ class Phase2AuditEngine:
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '2.0.0',
-            'hostname': os.uname().nodename,
+            'version': '1.0.6',
+            'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
             'environment': os.environ.get('VIGILEGUARD_ENV', 'production'),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -914,8 +941,8 @@ def main_phase2():
                     from enhanced_reporting import ReportManager
                     report_manager = ReportManager(findings, {
                         'timestamp': datetime.now().isoformat(),
-                        'hostname': os.uname().nodename,
-                        'version': '2.0.0'
+                        'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
+                        'version': '1.0.6'
                     })
                     
                     if output_format == 'html':
