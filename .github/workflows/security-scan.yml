@@ -15,6 +15,8 @@ on:
 permissions:
   contents: read
   security-events: write
+  issues: write  # Required for creating security issues
+  pull-requests: read
 
 jobs:
   security-scan:
@@ -75,25 +77,40 @@ jobs:
           retention-days: 30
 
       - name: Create security issue on failure
-        if: failure()
+        if: failure() && github.event_name != 'pull_request'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🔒 Security Scan Failed',
-              body: `
-              Security scan failed in workflow run: ${context.runId}
-              
-              Please review the security scan results and address any issues found.
-              
-              - Check Bandit results for code security issues
-              - Review Safety results for dependency vulnerabilities
-              - Examine CodeQL results for additional security findings
-              
-              Run ID: ${context.runId}
-              Commit: ${context.sha}
-              `,
-              labels: ['security', 'urgent']
-            });
+            try {
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🔒 Security Scan Failed',
+                body: `
+                Security scan failed in workflow run: ${context.runId}
+                
+                Please review the security scan results and address any issues found.
+                
+                - Check Bandit results for code security issues
+                - Review Safety results for dependency vulnerabilities
+                - Examine CodeQL results for additional security findings
+                
+                **Workflow Details:**
+                - Run ID: ${context.runId}
+                - Commit: ${context.sha}
+                - Branch: ${context.ref}
+                - Actor: ${context.actor}
+                
+                **Links:**
+                - [Workflow Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+                - [Commit](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha})
+                `,
+                labels: ['security', 'urgent', 'automated']
+              });
+              console.log(`Created security issue #${issue.data.number}`);
+            } catch (error) {
+              console.log(`Failed to create issue: ${error.message}`);
+              console.log('This may be due to insufficient permissions or repository settings.');
+              // Don't fail the workflow if issue creation fails
+            }
