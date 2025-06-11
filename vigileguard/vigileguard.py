@@ -2154,7 +2154,7 @@ class AuditEngine:
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '2.0.1' if self.phase2_available else __version__,
+            'version': '2.0.1' if getattr(self, 'phase2_available', False) else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -2397,8 +2397,8 @@ class AuditEngine:
     def _generate_json_report(self) -> str:
         """Generate JSON report with server information"""
         report = {
-            "scan_info": self._get_scan_info(),
-            "server_summary": self.server_summary,
+            "scan_info": self._get_scan_info(),  # This line is crucial!
+            "server_summary": getattr(self, 'server_summary', {}),
             "summary": {
                 "total_findings": len(self.all_findings),
                 "by_severity": {}
@@ -2411,7 +2411,7 @@ class AuditEngine:
             severity = finding.severity.value
             report["summary"]["by_severity"][severity] = report["summary"]["by_severity"].get(severity, 0) + 1
         
-        return json.dumps(report, indent=2)
+        return json.dumps(report, indent=2, default=str)
     
 
 
