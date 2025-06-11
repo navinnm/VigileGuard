@@ -468,6 +468,46 @@ jobs:
           echo "Running security audit on GitHub Actions runner..."
           echo ""
           
+          # Create the report analyzer script
+          cat > report_analyzer.py << 'EOF'
+          #!/usr/bin/env python3
+          import json
+          import sys
+          import os
+
+          def analyze_report(report_file):
+              try:
+                  if not os.path.exists(report_file) or os.path.getsize(report_file) == 0:
+                      print("⚠️ Report file not found or empty")
+                      return False
+                  with open(report_file, 'r') as f:
+                      data = json.load(f)
+                  total = data.get('summary', {}).get('total_findings', 0)
+                  by_severity = data.get('summary', {}).get('by_severity', {})
+                  print(f'🔍 Total findings: {total}')
+                  for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+                      count = by_severity.get(severity, 0)
+                      if count > 0:
+                          emoji = '🔴' if severity in ['CRITICAL', 'HIGH'] else '🟡' if severity == 'MEDIUM' else '🔵'
+                          print(f'{emoji} {severity}: {count}')
+                  print('')
+                  print('✅ VigileGuard Phase 1 + 2 successfully identified security issues!')
+                  findings = data.get('findings', [])
+                  categories = set(f.get('category', 'Unknown') for f in findings)
+                  if categories:
+                      print(f'📂 Categories checked: {", ".join(sorted(categories))}')
+                  return True
+              except Exception as e:
+                  print(f'⚠️ Analysis failed: {e}')
+                  return False
+
+          if __name__ == '__main__':
+              report_file = sys.argv[1] if len(sys.argv) > 1 else 'demo-report.json'
+              print('📋 Security Audit Summary:')
+              analyze_report(report_file)
+              sys.exit(0)
+          EOF
+          
           # Run console output (Phase 1 + 2)
           timeout 180 python vigileguard.py --format console || true
           
@@ -479,44 +519,9 @@ jobs:
           echo "🌐 Generating HTML report (Phase 2)..."
           timeout 180 python vigileguard.py --format html --output demo-report.html || true
           
-          if [ -f demo-report.json ] && [ -s demo-report.json ]; then
-            echo ""
-            echo "📋 Security Audit Summary:"
-            # FIXED: Proper multiline Python string with escape characters
-            python -c '
-              import json
-              import sys
-
-              try:
-                  with open("demo-report.json", "r") as f:
-                      data = json.load(f)
-                      total = data.get("summary", {}).get("total_findings", 0)
-                      by_severity = data.get("summary", {}).get("by_severity", {})
-                      
-                      print(f"🔍 Total findings: {total}")
-                      for severity, count in by_severity.items():
-                          if count > 0:
-                              emoji = "🔴" if severity in ["CRITICAL", "HIGH"] else "🟡" if severity == "MEDIUM" else "🔵"
-                              print(f"{emoji} {severity}: {count}")
-                      print("")
-                      print("✅ VigileGuard Phase 1 + 2 successfully identified security issues!")
-                      print("📖 This demonstrates both Phase 1 and Phase 2 features are working.")
-                      
-                      # Show categories found
-                      findings = data.get("findings", [])
-                      categories = set(f.get("category", "Unknown") for f in findings)
-                      if categories:
-                          print(f"📂 Categories checked: {', '.join(sorted(categories))}")
-              except json.JSONDecodeError as e:
-                  print(f"⚠️ JSON file exists but contains invalid JSON: {e}")
-                  sys.exit(0)  # Non-critical error
-              except FileNotFoundError:
-                  print("⚠️ Demo report file not found")
-                  sys.exit(0)  # Non-critical error
-              except Exception as e:
-                  print(f"⚠️ JSON validation failed: {e}")
-                  sys.exit(0)  # Non-critical error
-              '
+          # Analyze the report using the dedicated script
+          if [ -f demo-report.json ]; then
+            python report_analyzer.py demo-report.json
           else
             echo "⚠️ Demo report not generated, but this is non-critical for CI/CD"
           fi
@@ -524,46 +529,103 @@ jobs:
       - name: Generate demo badge
         run: |
           echo "🏷️ Generating demo badge..."
-          # FIXED: Proper multiline Python string handling
-          python -c '
-            import json
-            import os
-
-            try:
-                if os.path.exists("demo-report.json") and os.path.getsize("demo-report.json") > 0:
-                    with open("demo-report.json", "r") as f:
-                        data = json.load(f)
-                        total = data.get("summary", {}).get("total_findings", 0)
-                        by_severity = data.get("summary", {}).get("by_severity", {})
-                        critical_high = by_severity.get("CRITICAL", 0) + by_severity.get("HIGH", 0)
-                else:
-                    total = 0
-                    critical_high = 0
-                    
-                # Create a simple badge data
-                badge_data = {
-                    "schemaVersion": 1,
-                    "label": "VigileGuard Demo",
-                    "message": f"{total} findings ({critical_high} critical/high)",
-                    "color": "red" if critical_high > 0 else "yellow" if total > 0 else "green"
-                }
-                
-                with open("demo-badge.json", "w") as badge_file:
-                    json.dump(badge_data, badge_file, indent=2)
-                    
-                print("✅ Demo badge generated successfully")
-            except Exception as e:
-                # Fallback badge
-                badge_data = {
-                    "schemaVersion": 1,
-                    "label": "VigileGuard Demo",
-                    "message": "completed",
-                    "color": "blue"
-                }
-                with open("demo-badge.json", "w") as badge_file:
-                    json.dump(badge_data, badge_file, indent=2)
-                print(f"⚠️ Demo badge generation had issues: {e}, created fallback badge")
-            '
+          # Create complete badge generator script
+          cat > badge_generator.py << 'EOF'
+          #!/usr/bin/env python3
+          import json
+          import os
+          import sys
+          
+          def create_badge(report_file, badge_file):
+              """Create demo badge from VigileGuard report"""
+              try:
+                  # Default values
+                  total = 0
+                  critical_high = 0
+                  
+                  # Try to read report file
+                  if os.path.exists(report_file) and os.path.getsize(report_file) > 0:
+                      try:
+                          with open(report_file, 'r') as f:
+                              data = json.load(f)
+                              total = data.get('summary', {}).get('total_findings', 0)
+                              by_severity = data.get('summary', {}).get('by_severity', {})
+                              critical_high = by_severity.get('CRITICAL', 0) + by_severity.get('HIGH', 0)
+                              print(f'📊 Report analysis: {total} total findings, {critical_high} critical/high')
+                      except (json.JSONDecodeError, KeyError) as e:
+                          print(f'⚠️ Report parsing failed: {e}, using defaults')
+                  else:
+                      print('⚠️ Report file not found or empty, using defaults')
+                  
+                  # Create badge data
+                  if critical_high > 0:
+                      color = 'red'
+                      status = 'critical issues found'
+                  elif total > 0:
+                      color = 'yellow' 
+                      status = 'issues found'
+                  else:
+                      color = 'green'
+                      status = 'clean'
+                  
+                  badge_data = {
+                      'schemaVersion': 1,
+                      'label': 'VigileGuard Demo',
+                      'message': f'{total} findings ({critical_high} critical/high)',
+                      'color': color,
+                      'namedLogo': 'shield',
+                      'style': 'flat-square'
+                  }
+                  
+                  # Write badge file
+                  with open(badge_file, 'w') as f:
+                      json.dump(badge_data, f, indent=2)
+                  
+                  print(f'✅ Badge created successfully: {badge_file}')
+                  print(f'   Status: {status}')
+                  print(f'   Color: {color}')
+                  return True
+                  
+              except Exception as e:
+                  print(f'❌ Badge creation failed: {e}')
+                  # Create fallback badge
+                  try:
+                      fallback_badge = {
+                          'schemaVersion': 1,
+                          'label': 'VigileGuard Demo',
+                          'message': 'scan completed',
+                          'color': 'blue',
+                          'style': 'flat-square'
+                      }
+                      with open(badge_file, 'w') as f:
+                          json.dump(fallback_badge, f, indent=2)
+                      print(f'🔄 Fallback badge created: {badge_file}')
+                      return True
+                  except:
+                      print('❌ Even fallback badge creation failed')
+                      return False
+          
+          def main():
+              """Main function"""
+              # Get command line arguments
+              report_file = sys.argv[1] if len(sys.argv) > 1 else 'demo-report.json'
+              badge_file = sys.argv[2] if len(sys.argv) > 2 else 'demo-badge.json'
+              
+              print(f'🏷️ Creating badge from: {report_file}')
+              print(f'   Output file: {badge_file}')
+              
+              success = create_badge(report_file, badge_file)
+              
+              # Always exit 0 to not fail CI/CD
+              sys.exit(0 if success else 0)
+          
+          if __name__ == '__main__':
+              main()
+          EOF
+          
+          # Make script executable and run it
+          chmod +x badge_generator.py
+          python badge_generator.py demo-report.json demo-badge.json
 
       - name: Upload demo results
         uses: actions/upload-artifact@v4
