@@ -17,6 +17,8 @@ import subprocess
 import stat
 import pwd
 import grp
+import re
+import socket
 import platform
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -1217,434 +1219,914 @@ class SystemInfoChecker(SecurityChecker):
                     )
 
 class NetworkExposureChecker(SecurityChecker):
-    """Check for IP exposure and network security issues"""
+    """Enhanced network exposure checker with comprehensive server information detection"""
 
     def __init__(self):
-        super().__init__()
-        self.public_ip_ranges = [
-            # These are examples - in practice, you'd check against actual public ranges
-            "0.0.0.0/0",  # Default route
-        ]
-        self.private_ip_ranges = [
-            "10.0.0.0/8",
-            "172.16.0.0/12", 
-            "192.168.0.0/16",
-            "127.0.0.0/8",
-            "169.254.0.0/16"
-        ]
+        self.findings: List[Finding] = []
+        self.server_info = {
+            'ip_addresses': {},
+            'domain_names': [],
+            'web_servers': [],
+            'installed_languages': {},
+            'network_services': [],
+            'system_info': {}
+        }
 
     def check(self) -> List[Finding]:
-        """Run network exposure checks"""
-        if RICH_AVAILABLE:
-            console.print("🌍 Checking network exposure and IP configuration...", style="yellow")
-        else:
-            print("🌍 Checking network exposure and IP configuration...")
-
-        # Check for public IP exposure
+        """Run enhanced network exposure and server information checks"""
+        print("🌍 Enhanced Network & Server Information Analysis...")
+        
+        # Collect comprehensive server information
+        self._detect_server_ip_addresses()
+        self._detect_domain_names()
+        self._detect_web_servers()
+        self._detect_installed_languages()
+        self._detect_network_services()
+        self._detect_system_information()
+        
+        # Run security checks
         self._check_public_ip_exposure()
-        
-        # Check for exposed services on public interfaces
         self._check_exposed_services()
+        self._check_web_server_security()
+        self._check_programming_language_exposure()
+        self._check_domain_configuration()
         
-        # Check network interface configurations
-        self._check_network_interfaces()
+        # Add informational findings about server details
+        self._add_server_information_findings()
         
-        # Check for IP forwarding
-        self._check_ip_forwarding()
-        
-        # Check for exposed databases
-        self._check_exposed_databases()
-        
-        # Check for cloud metadata exposure
-        self._check_cloud_metadata_exposure()
-
         return self.findings
 
-    def _check_public_ip_exposure(self):
-        """Check for services exposed on public IP addresses"""
-        if RICH_AVAILABLE:
-            console.print("  🔍 Checking public IP exposure...", style="blue")
-        else:
-            print("  🔍 Checking public IP exposure...")
-
-        # Get network interfaces and their IPs
-        cmd = "ip addr show 2>/dev/null || ifconfig 2>/dev/null"
-        returncode, stdout, stderr = self.run_command(cmd)
+    def _detect_server_ip_addresses(self):
+        """Detect all server IP addresses and their interfaces"""
+        print("  🔍 Detecting IP addresses and network interfaces...")
         
-        public_ips = []
-        interface_info = {}
+        # Get network interfaces using multiple methods
+        interfaces = {}
+        
+        # Method 1: ip command
+        cmd = "ip addr show 2>/dev/null"
+        returncode, stdout, stderr = self._run_command(cmd)
         
         if returncode == 0 and stdout:
-            lines = stdout.split('\n')
             current_interface = None
-            
-            for line in lines:
+            for line in stdout.split('\n'):
                 # Parse interface names
                 if line.strip() and not line.startswith(' '):
                     if ':' in line:
-                        current_interface = line.split(':')[1].strip() if len(line.split(':')) > 1 else line.split()[0]
-                        interface_info[current_interface] = {'ips': [], 'status': 'unknown'}
+                        parts = line.split(':')
+                        if len(parts) > 1:
+                            current_interface = parts[1].strip()
+                            interfaces[current_interface] = {
+                                'ips': [],
+                                'status': 'UP' if 'UP' in line else 'DOWN',
+                                'type': 'unknown'
+                            }
                 
                 # Parse IP addresses
-                if 'inet ' in line and current_interface:
-                    ip_match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', line)
+                elif 'inet ' in line and current_interface:
+                    ip_match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)/(\d+)', line)
                     if ip_match:
                         ip = ip_match.group(1)
-                        interface_info[current_interface]['ips'].append(ip)
-                        
-                        # Check if IP is public (simplified check)
-                        if not self._is_private_ip(ip):
-                            public_ips.append({'ip': ip, 'interface': current_interface})
+                        subnet = ip_match.group(2)
+                        interfaces[current_interface]['ips'].append({
+                            'ip': ip,
+                            'subnet': subnet,
+                            'type': self._classify_ip_address(ip)
+                        })
+        
+        # Method 2: ifconfig fallback
+        if not interfaces:
+            cmd = "ifconfig 2>/dev/null"
+            returncode, stdout, stderr = self._run_command(cmd)
+            
+            if returncode == 0 and stdout:
+                current_interface = None
+                for line in stdout.split('\n'):
+                    if line and not line.startswith(' ') and ':' in line:
+                        current_interface = line.split(':')[0]
+                        interfaces[current_interface] = {'ips': [], 'status': 'unknown', 'type': 'unknown'}
+                    elif 'inet ' in line and current_interface:
+                        ip_match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', line)
+                        if ip_match:
+                            ip = ip_match.group(1)
+                            interfaces[current_interface]['ips'].append({
+                                'ip': ip,
+                                'subnet': 'unknown',
+                                'type': self._classify_ip_address(ip)
+                            })
+        
+        # Get public IP using external services
+        public_ip = self._get_public_ip()
+        if public_ip:
+            interfaces['external'] = {
+                'ips': [{'ip': public_ip, 'subnet': 'unknown', 'type': 'public'}],
+                'status': 'UP',
+                'type': 'external'
+            }
+        
+        self.server_info['ip_addresses'] = interfaces
 
-        # Check what services are listening on public IPs
-        exposed_services = []
-        if public_ips:
-            cmd = "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null"
-            returncode, stdout, stderr = self.run_command(cmd)
+    def _detect_domain_names(self):
+        """Detect associated domain names"""
+        print("  🌐 Detecting domain names...")
+        
+        domains = []
+        
+        # Check hostname
+        try:
+            hostname = socket.gethostname()
+            fqdn = socket.getfqdn()
+            
+            if hostname != fqdn and '.' in fqdn:
+                domains.append({
+                    'domain': fqdn,
+                    'type': 'hostname_fqdn',
+                    'source': 'system_hostname'
+                })
+        except:
+            pass
+        
+        # Check /etc/hosts for domain entries
+        try:
+            with open('/etc/hosts', 'r') as f:
+                for line in f:
+                    if line.strip() and not line.startswith('#'):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            for domain in parts[1:]:
+                                if '.' in domain and not domain.startswith('localhost'):
+                                    domains.append({
+                                        'domain': domain,
+                                        'type': 'hosts_file',
+                                        'source': '/etc/hosts'
+                                    })
+        except:
+            pass
+        
+        # Check web server configurations for domain names
+        web_configs = [
+            '/etc/nginx/sites-enabled/*',
+            '/etc/nginx/sites-available/*',
+            '/etc/apache2/sites-enabled/*',
+            '/etc/apache2/sites-available/*',
+            '/etc/httpd/conf.d/*.conf'
+        ]
+        
+        for config_pattern in web_configs:
+            cmd = f"grep -h 'server_name\\|ServerName\\|ServerAlias' {config_pattern} 2>/dev/null || true"
+            returncode, stdout, stderr = self._run_command(cmd)
             
             if returncode == 0 and stdout:
                 for line in stdout.split('\n'):
-                    if 'LISTEN' in line or ':' in line:
-                        for pub_ip in public_ips:
-                            if pub_ip['ip'] in line or '0.0.0.0:' in line:
-                                port_match = re.search(r':(\d+)\s', line)
-                                if port_match:
-                                    port = port_match.group(1)
-                                    service_info = {
-                                        'ip': pub_ip['ip'],
-                                        'interface': pub_ip['interface'],
-                                        'port': port,
-                                        'line': line.strip()
-                                    }
-                                    # Determine service type
-                                    service_info['service_type'] = self._identify_service_type(port)
-                                    service_info['risk_level'] = self._assess_service_risk(port)
-                                    exposed_services.append(service_info)
+                    if line.strip():
+                        # Extract domain names from web server configs
+                        domain_matches = re.findall(r'(?:server_name|ServerName|ServerAlias)\s+([^\s;]+)', line)
+                        for domain in domain_matches:
+                            if '.' in domain and domain != '_' and not domain.startswith('*.'):
+                                domains.append({
+                                    'domain': domain,
+                                    'type': 'web_server_config',
+                                    'source': 'web_server_configuration'
+                                })
+        
+        # Remove duplicates
+        unique_domains = []
+        seen = set()
+        for domain in domains:
+            if domain['domain'] not in seen:
+                unique_domains.append(domain)
+                seen.add(domain['domain'])
+        
+        self.server_info['domain_names'] = unique_domains
 
-        if public_ips:
-            severity = SeverityLevel.HIGH if exposed_services else SeverityLevel.MEDIUM
+    def _detect_web_servers(self):
+        """Detect installed and running web servers"""
+        print("  🖥️ Detecting web servers...")
+        
+        web_servers = []
+        
+        # Check for running web server processes
+        processes = [
+            {'name': 'nginx', 'service': 'Nginx'},
+            {'name': 'apache2', 'service': 'Apache'},
+            {'name': 'httpd', 'service': 'Apache HTTPD'},
+            {'name': 'lighttpd', 'service': 'Lighttpd'},
+            {'name': 'caddy', 'service': 'Caddy'},
+            {'name': 'traefik', 'service': 'Traefik'},
+            {'name': 'node', 'service': 'Node.js Server'},
+            {'name': 'gunicorn', 'service': 'Gunicorn (Python)'},
+            {'name': 'uwsgi', 'service': 'uWSGI'},
+            {'name': 'php-fpm', 'service': 'PHP-FPM'},
+            {'name': 'tomcat', 'service': 'Apache Tomcat'},
+            {'name': 'jetty', 'service': 'Eclipse Jetty'}
+        ]
+        
+        for proc in processes:
+            cmd = f"pgrep -f {proc['name']} 2>/dev/null"
+            returncode, stdout, stderr = self._run_command(cmd)
             
-            self.add_finding(
-                category="Network Exposure",
-                severity=severity,
-                title=f"Public IP exposure detected ({len(public_ips)} public IPs)",
-                description=f"Found {len(public_ips)} public IP addresses with {len(exposed_services)} exposed services. " +
-                           "Public IP exposure can make services accessible from the internet, increasing attack surface.",
-                recommendation="Review all publicly exposed services. Use firewalls to restrict access. " +
-                              "Consider using VPN or private networks for sensitive services. " +
-                              "Implement proper access controls and monitoring.",
-                details={
-                    "public_ips": public_ips,
-                    "exposed_services": exposed_services,
-                    "interface_info": interface_info
-                }
-            )
-
-    def _check_exposed_services(self):
-        """Check for high-risk services exposed to public networks"""
-        if RICH_AVAILABLE:
-            console.print("  ⚠️ Checking for exposed high-risk services...", style="blue")
-        else:
-            print("  ⚠️ Checking for exposed high-risk services...")
-
-        # High-risk services that should not be publicly exposed
-        high_risk_services = {
-            '22': {'name': 'SSH', 'risk': 'HIGH', 'reason': 'Remote access protocol'},
-            '23': {'name': 'Telnet', 'risk': 'CRITICAL', 'reason': 'Unencrypted remote access'},
-            '21': {'name': 'FTP', 'risk': 'HIGH', 'reason': 'File transfer protocol'},
-            '3389': {'name': 'RDP', 'risk': 'HIGH', 'reason': 'Windows remote desktop'},
-            '5432': {'name': 'PostgreSQL', 'risk': 'CRITICAL', 'reason': 'Database server'},
-            '3306': {'name': 'MySQL', 'risk': 'CRITICAL', 'reason': 'Database server'},
-            '1433': {'name': 'SQL Server', 'risk': 'CRITICAL', 'reason': 'Database server'},
-            '27017': {'name': 'MongoDB', 'risk': 'CRITICAL', 'reason': 'Database server'},
-            '6379': {'name': 'Redis', 'risk': 'HIGH', 'reason': 'In-memory database'},
-            '9200': {'name': 'Elasticsearch', 'risk': 'HIGH', 'reason': 'Search engine'},
-            '2375': {'name': 'Docker', 'risk': 'CRITICAL', 'reason': 'Container management'},
-            '8080': {'name': 'HTTP Alt', 'risk': 'MEDIUM', 'reason': 'Alternative web server'},
-            '8443': {'name': 'HTTPS Alt', 'risk': 'MEDIUM', 'reason': 'Alternative secure web'},
-        }
-
-        cmd = "netstat -tln 2>/dev/null | grep LISTEN || ss -tln 2>/dev/null"
-        returncode, stdout, stderr = self.run_command(cmd)
+            if returncode == 0 and stdout.strip():
+                # Get more details about the process
+                pids = stdout.strip().split('\n')
+                cmd = f"ps -p {pids[0]} -o pid,cmd --no-headers 2>/dev/null"
+                returncode2, stdout2, stderr2 = self._run_command(cmd)
+                
+                if returncode2 == 0:
+                    web_servers.append({
+                        'name': proc['service'],
+                        'process': proc['name'],
+                        'status': 'running',
+                        'pids': pids,
+                        'command': stdout2.strip() if stdout2 else 'unknown'
+                    })
         
-        exposed_risky_services = []
-        all_exposed_ports = []
+        # Check for web server installations (even if not running)
+        installation_checks = [
+            {'command': 'nginx -v 2>&1', 'name': 'Nginx', 'pattern': r'nginx version: nginx/(.+)'},
+            {'command': 'apache2 -v 2>&1', 'name': 'Apache', 'pattern': r'Server version: Apache/(.+)'},
+            {'command': 'httpd -v 2>&1', 'name': 'Apache HTTPD', 'pattern': r'Server version: Apache/(.+)'},
+            {'command': 'lighttpd -v 2>&1', 'name': 'Lighttpd', 'pattern': r'lighttpd/(.+)'},
+            {'command': 'caddy version 2>&1', 'name': 'Caddy', 'pattern': r'v(.+)'},
+        ]
         
+        for check in installation_checks:
+            returncode, stdout, stderr = self._run_command(check['command'])
+            if returncode == 0 and stdout:
+                version_match = re.search(check['pattern'], stdout)
+                version = version_match.group(1) if version_match else 'unknown'
+                
+                # Check if already found as running
+                found_running = any(ws['name'] == check['name'] for ws in web_servers)
+                if not found_running:
+                    web_servers.append({
+                        'name': check['name'],
+                        'process': check['name'].lower(),
+                        'status': 'installed',
+                        'version': version,
+                        'command': 'not running'
+                    })
+                else:
+                    # Add version info to running server
+                    for ws in web_servers:
+                        if ws['name'] == check['name']:
+                            ws['version'] = version
+        
+        # Check listening ports for web services
+        cmd = "netstat -tln 2>/dev/null | grep -E ':(80|443|8080|8443|3000|5000|8000)' || ss -tln 2>/dev/null | grep -E ':(80|443|8080|8443|3000|5000|8000)'"
+        returncode, stdout, stderr = self._run_command(cmd)
+        
+        web_ports = []
         if returncode == 0 and stdout:
             for line in stdout.split('\n'):
                 if ':' in line:
-                    # Extract listening addresses and ports
-                    parts = line.split()
-                    for part in parts:
-                        if ':' in part and ('0.0.0.0:' in part or '*:' in part or ':::' in part):
-                            port_match = re.search(r':(\d+)$', part)
-                            if port_match:
-                                port = port_match.group(1)
-                                all_exposed_ports.append(port)
-                                
-                                if port in high_risk_services:
-                                    service = high_risk_services[port]
-                                    exposed_risky_services.append({
-                                        'port': port,
-                                        'name': service['name'],
-                                        'risk': service['risk'],
-                                        'reason': service['reason'],
-                                        'binding': part
-                                    })
-
-        if exposed_risky_services:
-            # Determine overall severity
-            has_critical = any(s['risk'] == 'CRITICAL' for s in exposed_risky_services)
-            severity = SeverityLevel.CRITICAL if has_critical else SeverityLevel.HIGH
-            
-            self.add_finding(
-                category="Network Exposure",
-                severity=severity,
-                title=f"High-risk services exposed ({len(exposed_risky_services)} services)",
-                description=f"Found {len(exposed_risky_services)} high-risk services listening on all interfaces. " +
-                           "These services can be accessed from external networks and pose significant security risks.",
-                recommendation="Restrict access to high-risk services using firewalls. " +
-                              "Bind services to localhost (127.0.0.1) when possible. " +
-                              "Use VPN or SSH tunneling for remote access. Implement strong authentication.",
-                details={
-                    "exposed_risky_services": exposed_risky_services,
-                    "all_exposed_ports": all_exposed_ports,
-                    "total_exposed": len(all_exposed_ports)
-                }
-            )
-
-    def _check_network_interfaces(self):
-        """Check network interface configurations"""
-        if RICH_AVAILABLE:
-            console.print("  🔌 Checking network interface configurations...", style="blue")
-        else:
-            print("  🔌 Checking network interface configurations...")
-
-        # Check for promiscuous mode
-        cmd = "ip link show 2>/dev/null || ifconfig 2>/dev/null"
-        returncode, stdout, stderr = self.run_command(cmd)
+                    port_match = re.search(r':(\d+)\s', line)
+                    if port_match:
+                        port = port_match.group(1)
+                        if port in ['80', '443', '8080', '8443', '3000', '5000', '8000']:
+                            web_ports.append({
+                                'port': port,
+                                'type': 'HTTP' if port in ['80', '8080', '3000', '5000', '8000'] else 'HTTPS',
+                                'binding': line.strip()
+                            })
         
-        promiscuous_interfaces = []
-        all_interfaces = []
+        # Add port information to server info
+        for server in web_servers:
+            server['listening_ports'] = web_ports
         
-        if returncode == 0 and stdout:
-            for line in stdout.split('\n'):
-                if 'PROMISC' in line:
-                    interface_match = re.search(r'(\w+):', line)
-                    if interface_match:
-                        promiscuous_interfaces.append(interface_match.group(1))
-                
-                # Collect all interfaces
-                if ':' in line and not line.startswith(' '):
-                    interface_match = re.search(r'(\w+):', line)
-                    if interface_match:
-                        all_interfaces.append(interface_match.group(1))
+        self.server_info['web_servers'] = web_servers
 
-        if promiscuous_interfaces:
-            self.add_finding(
-                category="Network Exposure",
-                severity=SeverityLevel.MEDIUM,
-                title="Network interfaces in promiscuous mode",
-                description=f"Found {len(promiscuous_interfaces)} interfaces in promiscuous mode: {', '.join(promiscuous_interfaces)}. " +
-                           "Promiscuous mode allows interface to capture all network traffic.",
-                recommendation="Disable promiscuous mode unless required for network monitoring: ip link set <interface> promisc off",
-                details={"promiscuous_interfaces": promiscuous_interfaces}
-            )
-
-        # Check for unusual network configurations
-        self._check_unusual_network_configs()
-
-    def _check_ip_forwarding(self):
-        """Check if IP forwarding is enabled"""
-        if RICH_AVAILABLE:
-            console.print("  🔀 Checking IP forwarding configuration...", style="blue")
-        else:
-            print("  🔀 Checking IP forwarding configuration...")
-
-        forwarding_enabled = []
+    def _detect_installed_languages(self):
+        """Detect installed programming languages and runtimes"""
+        print("  💻 Detecting installed programming languages...")
         
-        # Check IPv4 forwarding
-        if os.path.exists('/proc/sys/net/ipv4/ip_forward'):
-            try:
-                with open('/proc/sys/net/ipv4/ip_forward', 'r') as f:
-                    if f.read().strip() == '1':
-                        forwarding_enabled.append('IPv4')
-            except (OSError, PermissionError):
-                pass
-
-        # Check IPv6 forwarding
-        if os.path.exists('/proc/sys/net/ipv6/conf/all/forwarding'):
-            try:
-                with open('/proc/sys/net/ipv6/conf/all/forwarding', 'r') as f:
-                    if f.read().strip() == '1':
-                        forwarding_enabled.append('IPv6')
-            except (OSError, PermissionError):
-                pass
-
-        if forwarding_enabled:
-            # Check if this is a router/gateway system
-            cmd = "route -n 2>/dev/null | grep '^0.0.0.0' || ip route show default 2>/dev/null"
-            returncode, stdout, stderr = self.run_command(cmd)
-            
-            is_likely_router = False
+        languages = {}
+        
+        # Language detection commands
+        language_checks = [
+            {'name': 'Python', 'commands': ['python3 --version', 'python --version'], 'pattern': r'Python (.+)'},
+            {'name': 'Node.js', 'commands': ['node --version'], 'pattern': r'v(.+)'},
+            {'name': 'PHP', 'commands': ['php --version'], 'pattern': r'PHP (.+?) '},
+            {'name': 'Ruby', 'commands': ['ruby --version'], 'pattern': r'ruby (.+?) '},
+            {'name': 'Java', 'commands': ['java -version 2>&1'], 'pattern': r'version "(.+?)"'},
+            {'name': 'Go', 'commands': ['go version'], 'pattern': r'go version go(.+?) '},
+            {'name': 'Rust', 'commands': ['rustc --version'], 'pattern': r'rustc (.+?) '},
+            {'name': 'Perl', 'commands': ['perl --version'], 'pattern': r'This is perl.+?v(.+?) '},
+            {'name': 'Bash', 'commands': ['bash --version'], 'pattern': r'GNU bash, version (.+?) '},
+            {'name': '.NET', 'commands': ['dotnet --version'], 'pattern': r'(.+)'},
+            {'name': 'C/C++', 'commands': ['gcc --version'], 'pattern': r'gcc.+? (.+?) '},
+        ]
+        
+        for lang in language_checks:
+            for cmd in lang['commands']:
+                returncode, stdout, stderr = self._run_command(cmd)
+                if returncode == 0 and (stdout or stderr):
+                    output = stdout or stderr
+                    version_match = re.search(lang['pattern'], output)
+                    if version_match:
+                        version = version_match.group(1).strip()
+                        languages[lang['name']] = {
+                            'version': version,
+                            'command': cmd,
+                            'status': 'installed'
+                        }
+                        break
+        
+        # Check for package managers and frameworks
+        package_managers = [
+            {'name': 'npm', 'command': 'npm --version', 'language': 'Node.js'},
+            {'name': 'pip', 'command': 'pip --version', 'language': 'Python'},
+            {'name': 'pip3', 'command': 'pip3 --version', 'language': 'Python'},
+            {'name': 'composer', 'command': 'composer --version', 'language': 'PHP'},
+            {'name': 'gem', 'command': 'gem --version', 'language': 'Ruby'},
+            {'name': 'cargo', 'command': 'cargo --version', 'language': 'Rust'},
+        ]
+        
+        for pm in package_managers:
+            returncode, stdout, stderr = self._run_command(pm['command'])
             if returncode == 0 and stdout:
-                # Simple heuristic: multiple network interfaces + default route might indicate router
-                if len(forwarding_enabled) > 0:
-                    is_likely_router = True
+                if pm['language'] in languages:
+                    if 'package_managers' not in languages[pm['language']]:
+                        languages[pm['language']]['package_managers'] = []
+                    languages[pm['language']]['package_managers'].append(pm['name'])
+        
+        self.server_info['installed_languages'] = languages
 
-            severity = SeverityLevel.MEDIUM if is_likely_router else SeverityLevel.HIGH
-            
-            self.add_finding(
-                category="Network Exposure",
-                severity=severity,
-                title=f"IP forwarding enabled ({', '.join(forwarding_enabled)})",
-                description=f"IP forwarding is enabled for {', '.join(forwarding_enabled)}. " +
-                           "This allows the system to forward packets between network interfaces, " +
-                           "potentially exposing internal networks.",
-                recommendation="Disable IP forwarding if not needed: echo 0 > /proc/sys/net/ipv4/ip_forward. " +
-                              "If this system is a router, ensure proper firewall rules are in place.",
-                details={"forwarding_protocols": forwarding_enabled}
-            )
-
-    def _check_exposed_databases(self):
-        """Check for exposed database services"""
-        if RICH_AVAILABLE:
-            console.print("  🗄️ Checking for exposed database services...", style="blue")
-        else:
-            print("  🗄️ Checking for exposed database services...")
-
-        database_ports = {
-            '3306': 'MySQL',
-            '5432': 'PostgreSQL', 
-            '1433': 'SQL Server',
-            '1521': 'Oracle',
-            '27017': 'MongoDB',
-            '6379': 'Redis',
-            '9042': 'Cassandra',
-            '8086': 'InfluxDB',
-            '9200': 'Elasticsearch'
-        }
-
-        cmd = "netstat -tln 2>/dev/null | grep -E ':(" + "|".join(database_ports.keys()) + ")' || ss -tln 2>/dev/null | grep -E ':(" + "|".join(database_ports.keys()) + ")'"
-        returncode, stdout, stderr = self.run_command(cmd)
-
-        exposed_databases = []
+    def _detect_network_services(self):
+        """Detect all network services and their details"""
+        print("  🔌 Detecting network services...")
+        
+        # Get listening services
+        cmd = "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null"
+        returncode, stdout, stderr = self._run_command(cmd)
+        
+        services = []
         if returncode == 0 and stdout:
             for line in stdout.split('\n'):
-                if line.strip():
-                    for port, db_name in database_ports.items():
-                        if f':{port}' in line:
-                            # Check if exposed on all interfaces
-                            if '0.0.0.0:' in line or '*:' in line or ':::' in line:
-                                exposed_databases.append({
-                                    'port': port,
-                                    'database': db_name,
-                                    'binding': line.strip()
-                                })
+                if 'LISTEN' in line or ':' in line:
+                    # Parse service information
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        local_address = parts[3] if 'LISTEN' in line else parts[4]
+                        if ':' in local_address:
+                            ip, port = local_address.rsplit(':', 1)
+                            
+                            service_info = {
+                                'port': port,
+                                'ip': ip,
+                                'protocol': 'TCP',
+                                'service_name': self._identify_service_by_port(port),
+                                'process': 'unknown'
+                            }
+                            
+                            # Extract process information if available
+                            if len(parts) > 6:
+                                process_info = parts[-1]
+                                if '/' in process_info:
+                                    service_info['process'] = process_info.split('/')[-1]
+                            
+                            services.append(service_info)
+        
+        self.server_info['network_services'] = services
 
-        if exposed_databases:
-            self.add_finding(
+    def _detect_system_information(self):
+        """Detect comprehensive system information"""
+        print("  🖥️ Gathering system information...")
+        
+        system_info = {}
+        
+        # Operating system information
+        if os.path.exists('/etc/os-release'):
+            try:
+                with open('/etc/os-release', 'r') as f:
+                    for line in f:
+                        if '=' in line:
+                            key, value = line.strip().split('=', 1)
+                            system_info[key.lower()] = value.strip('"')
+            except:
+                pass
+        
+        # Kernel information
+        cmd = "uname -a"
+        returncode, stdout, stderr = self._run_command(cmd)
+        if returncode == 0:
+            system_info['kernel'] = stdout.strip()
+        
+        # Memory information
+        try:
+            with open('/proc/meminfo', 'r') as f:
+                for line in f:
+                    if line.startswith('MemTotal:'):
+                        system_info['memory_total'] = line.split()[1] + ' kB'
+                        break
+        except:
+            pass
+        
+        # CPU information
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                cpu_info = f.read()
+                cpu_count = cpu_info.count('processor')
+                system_info['cpu_cores'] = cpu_count
+                
+                model_match = re.search(r'model name\s*:\s*(.+)', cpu_info)
+                if model_match:
+                    system_info['cpu_model'] = model_match.group(1).strip()
+        except:
+            pass
+        
+        # Disk space
+        cmd = "df -h / 2>/dev/null"
+        returncode, stdout, stderr = self._run_command(cmd)
+        if returncode == 0 and stdout:
+            lines = stdout.split('\n')
+            if len(lines) > 1:
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    system_info['disk_total'] = parts[1]
+                    system_info['disk_used'] = parts[2]
+                    system_info['disk_available'] = parts[3]
+        
+        # Uptime
+        cmd = "uptime"
+        returncode, stdout, stderr = self._run_command(cmd)
+        if returncode == 0:
+            system_info['uptime'] = stdout.strip()
+        
+        self.server_info['system_info'] = system_info
+
+    def _check_public_ip_exposure(self):
+        """Check for public IP exposure with enhanced analysis"""
+        public_interfaces = []
+        exposed_services = []
+        
+        for interface, details in self.server_info['ip_addresses'].items():
+            for ip_info in details['ips']:
+                if ip_info['type'] == 'public':
+                    public_interfaces.append({
+                        'interface': interface,
+                        'ip': ip_info['ip'],
+                        'subnet': ip_info.get('subnet', 'unknown')
+                    })
+        
+        # Check what services are exposed on public IPs
+        for service in self.server_info['network_services']:
+            if service['ip'] in ['0.0.0.0', '*', '::'] or any(pub['ip'] == service['ip'] for pub in public_interfaces):
+                exposed_services.append(service)
+        
+        if public_interfaces:
+            severity = SeverityLevel.HIGH if exposed_services else SeverityLevel.MEDIUM
+            
+            self.findings.append(Finding(
+                category="Network Exposure",
+                severity=severity,
+                title=f"Public IP exposure detected ({len(public_interfaces)} public IPs)",
+                description=f"Server has {len(public_interfaces)} public IP addresses with {len(exposed_services)} exposed services.",
+                recommendation="Review all publicly exposed services. Implement firewall rules and access controls.",
+                details={
+                    "public_interfaces": public_interfaces,
+                    "exposed_services": exposed_services
+                }
+            ))
+
+    def _check_exposed_services(self):
+        """Check for high-risk exposed services"""
+        high_risk_ports = {
+            '22': 'SSH', '23': 'Telnet', '21': 'FTP', '3389': 'RDP',
+            '3306': 'MySQL', '5432': 'PostgreSQL', '1433': 'SQL Server',
+            '27017': 'MongoDB', '6379': 'Redis', '9200': 'Elasticsearch'
+        }
+        
+        risky_services = []
+        for service in self.server_info['network_services']:
+            if service['port'] in high_risk_ports and service['ip'] in ['0.0.0.0', '*', '::']:
+                risky_services.append({
+                    'port': service['port'],
+                    'service_name': high_risk_ports[service['port']],
+                    'process': service['process']
+                })
+        
+        if risky_services:
+            self.findings.append(Finding(
                 category="Network Exposure",
                 severity=SeverityLevel.CRITICAL,
-                title=f"Database services exposed ({len(exposed_databases)} databases)",
-                description=f"Found {len(exposed_databases)} database services listening on all interfaces. " +
-                           "Exposed databases can lead to data breaches and unauthorized access.",
-                recommendation="Bind database services to localhost (127.0.0.1) or specific internal IPs. " +
-                              "Use firewalls to restrict database access. Implement strong authentication and encryption.",
-                details={"exposed_databases": exposed_databases}
-            )
+                title=f"High-risk services exposed ({len(risky_services)} services)",
+                description=f"Found {len(risky_services)} high-risk services listening on all interfaces.",
+                recommendation="Restrict access to high-risk services using firewalls or bind to localhost only.",
+                details={"risky_services": risky_services}
+            ))
 
-    def _check_cloud_metadata_exposure(self):
-        """Check for cloud metadata service exposure"""
-        if RICH_AVAILABLE:
-            console.print("  ☁️ Checking cloud metadata exposure...", style="blue")
-        else:
-            print("  ☁️ Checking cloud metadata exposure...")
+    def _check_web_server_security(self):
+        """Check web server security configurations"""
+        for web_server in self.server_info['web_servers']:
+            if web_server['status'] == 'running':
+                # Check for common web server security issues
+                if web_server['name'] in ['Nginx', 'Apache', 'Apache HTTPD']:
+                    self._check_web_server_config_security(web_server)
 
-        # Check if cloud metadata service is accessible
-        metadata_endpoints = [
-            "169.254.169.254",  # AWS/Azure/GCP metadata
-            "169.254.169.255",  # Alternative metadata
-        ]
+    def _check_web_server_config_security(self, web_server):
+        """Check specific web server configuration security"""
+        config_files = []
+        
+        if 'nginx' in web_server['name'].lower():
+            config_files = ['/etc/nginx/nginx.conf']
+        elif 'apache' in web_server['name'].lower():
+            config_files = ['/etc/apache2/apache2.conf', '/etc/httpd/conf/httpd.conf']
+        
+        security_issues = []
+        for config_file in config_files:
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, 'r') as f:
+                        content = f.read()
+                        
+                        # Check for security headers
+                        if 'server_tokens off' not in content.lower():
+                            security_issues.append("Server tokens not disabled")
+                        
+                        # Check for SSL configuration
+                        if 'ssl_' not in content.lower() and 'SSLEngine' not in content:
+                            security_issues.append("SSL/TLS not configured")
+                            
+                except:
+                    pass
+        
+        if security_issues:
+            self.findings.append(Finding(
+                category="Web Server Security",
+                severity=SeverityLevel.MEDIUM,
+                title=f"{web_server['name']} security configuration issues",
+                description=f"Found {len(security_issues)} security configuration issues.",
+                recommendation="Review and fix web server security configuration.",
+                details={"issues": security_issues, "web_server": web_server['name']}
+            ))
 
-        accessible_metadata = []
-        for endpoint in metadata_endpoints:
-            cmd = f"curl -s --max-time 5 http://{endpoint}/latest/meta-data/ 2>/dev/null || wget -qO- --timeout=5 http://{endpoint}/latest/meta-data/ 2>/dev/null"
-            returncode, stdout, stderr = self.run_command(cmd)
+    def _check_programming_language_exposure(self):
+        """Check for programming language security issues"""
+        for lang_name, lang_info in self.server_info['installed_languages'].items():
+            # Check for development tools in production
+            if lang_name == 'Node.js':
+                # Check if development server is running
+                dev_ports = ['3000', '3001', '4200', '8080']
+                for service in self.server_info['network_services']:
+                    if service['port'] in dev_ports and 'node' in service['process'].lower():
+                        self.findings.append(Finding(
+                            category="Development Exposure",
+                            severity=SeverityLevel.MEDIUM,
+                            title=f"Development server exposed ({lang_name})",
+                            description=f"Node.js development server running on port {service['port']}",
+                            recommendation="Use production-ready server configuration and disable development tools."
+                        ))
+
+    def _check_domain_configuration(self):
+        """Check domain configuration security"""
+        if self.server_info['domain_names']:
+            # Check for domain security issues
+            domains = [d['domain'] for d in self.server_info['domain_names']]
             
-            if returncode == 0 and stdout.strip():
-                accessible_metadata.append({
-                    'endpoint': endpoint,
-                    'response_preview': stdout[:200] + "..." if len(stdout) > 200 else stdout
-                })
+            # Check for wildcard domains
+            wildcard_domains = [d for d in domains if d.startswith('*')]
+            if wildcard_domains:
+                self.findings.append(Finding(
+                    category="Domain Security",
+                    severity=SeverityLevel.MEDIUM,
+                    title="Wildcard domains configured",
+                    description=f"Found {len(wildcard_domains)} wildcard domain configurations.",
+                    recommendation="Review wildcard domain usage and ensure proper security controls."
+                ))
 
-        if accessible_metadata:
-            self.add_finding(
-                category="Network Exposure",
-                severity=SeverityLevel.HIGH,
-                title="Cloud metadata service accessible",
-                description="Cloud metadata service is accessible from this system. " +
-                           "This may expose sensitive cloud configuration and credentials.",
-                recommendation="Ensure proper IMDSv2 configuration on cloud instances. " +
-                              "Restrict metadata service access using iptables or cloud security groups.",
-                details={"accessible_endpoints": accessible_metadata}
-            )
+    def _add_server_information_findings(self):
+        """Add informational findings about server details"""
+        
+        # Server overview finding
+        overview_details = {
+            'ip_addresses': len([ip for interface in self.server_info['ip_addresses'].values() for ip in interface['ips']]),
+            'domain_names': len(self.server_info['domain_names']),
+            'web_servers': len(self.server_info['web_servers']),
+            'programming_languages': len(self.server_info['installed_languages']),
+            'network_services': len(self.server_info['network_services']),
+            'system_info': self.server_info['system_info']
+        }
+        
+        self.findings.append(Finding(
+            category="Server Information",
+            severity=SeverityLevel.INFO,
+            title="Server Overview",
+            description=f"Server has {overview_details['ip_addresses']} IP addresses, "
+                       f"{overview_details['domain_names']} domains, "
+                       f"{overview_details['web_servers']} web servers, "
+                       f"{overview_details['programming_languages']} programming languages, "
+                       f"and {overview_details['network_services']} network services.",
+            recommendation="Review server configuration and ensure all components are properly secured.",
+            details=overview_details
+        ))
+        
+        # Detailed findings for each category
+        if self.server_info['ip_addresses']:
+            self.findings.append(Finding(
+                category="Network Configuration",
+                severity=SeverityLevel.INFO,
+                title="Network Interfaces and IP Addresses",
+                description="Detailed network interface configuration",
+                recommendation="Ensure all network interfaces are properly configured and secured.",
+                details=self.server_info['ip_addresses']
+            ))
+        
+        if self.server_info['domain_names']:
+            self.findings.append(Finding(
+                category="Domain Configuration",
+                severity=SeverityLevel.INFO,
+                title="Domain Names and DNS Configuration",
+                description=f"Server configured with {len(self.server_info['domain_names'])} domain names",
+                recommendation="Ensure all domains are properly configured with appropriate DNS and SSL certificates.",
+                details={"domains": self.server_info['domain_names']}
+            ))
+        
+        if self.server_info['web_servers']:
+            self.findings.append(Finding(
+                category="Web Server Information",
+                severity=SeverityLevel.INFO,
+                title="Web Server Configuration",
+                description=f"Found {len(self.server_info['web_servers'])} web server installations",
+                recommendation="Ensure all web servers are properly configured, updated, and secured.",
+                details={"web_servers": self.server_info['web_servers']}
+            ))
+        
+        if self.server_info['installed_languages']:
+            self.findings.append(Finding(
+                category="Development Environment",
+                severity=SeverityLevel.INFO,
+                title="Programming Languages and Runtimes",
+                description=f"Server has {len(self.server_info['installed_languages'])} programming languages installed",
+                recommendation="Keep all programming languages and runtimes updated to latest secure versions.",
+                details={"languages": self.server_info['installed_languages']}
+            ))
 
-    def _is_private_ip(self, ip: str) -> bool:
-        """Check if an IP address is private"""
+    def get_server_summary(self) -> Dict[str, Any]:
+        """Get comprehensive server summary for report headers"""
+        primary_ip = None
+        primary_domain = None
+        primary_web_server = None
+        
+        # Find primary IP (first public IP or first private IP)
+        for interface, details in self.server_info['ip_addresses'].items():
+            for ip_info in details['ips']:
+                if ip_info['type'] == 'public' and not primary_ip:
+                    primary_ip = ip_info['ip']
+                    break
+            if primary_ip:
+                break
+        
+        if not primary_ip:
+            for interface, details in self.server_info['ip_addresses'].items():
+                if details['ips'] and interface != 'lo':
+                    primary_ip = details['ips'][0]['ip']
+                    break
+        
+        # Find primary domain
+        if self.server_info['domain_names']:
+            # Prefer web server configured domains
+            web_domains = [d for d in self.server_info['domain_names'] if d['type'] == 'web_server_config']
+            if web_domains:
+                primary_domain = web_domains[0]['domain']
+            else:
+                primary_domain = self.server_info['domain_names'][0]['domain']
+        
+        # Find primary web server
+        running_web_servers = [ws for ws in self.server_info['web_servers'] if ws['status'] == 'running']
+        if running_web_servers:
+            primary_web_server = running_web_servers[0]['name']
+        elif self.server_info['web_servers']:
+            primary_web_server = self.server_info['web_servers'][0]['name']
+        
+        # Get primary programming languages
+        primary_languages = list(self.server_info['installed_languages'].keys())[:3]
+        
+        return {
+            'primary_ip': primary_ip,
+            'primary_domain': primary_domain,
+            'primary_web_server': primary_web_server,
+            'primary_languages': primary_languages,
+            'total_services': len(self.server_info['network_services']),
+            'os_info': self.server_info['system_info'].get('pretty_name', 'Unknown OS'),
+            'hostname': self.server_info['system_info'].get('kernel', '').split()[1] if self.server_info['system_info'].get('kernel') else socket.gethostname(),
+            'server_info': self.server_info
+        }
+
+    def _classify_ip_address(self, ip: str) -> str:
+        """Classify IP address as public, private, or loopback"""
         try:
             import ipaddress
             ip_obj = ipaddress.ip_address(ip)
-            return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local
+            if ip_obj.is_loopback:
+                return 'loopback'
+            elif ip_obj.is_private:
+                return 'private'
+            elif ip_obj.is_link_local:
+                return 'link_local'
+            else:
+                return 'public'
         except:
-            # Fallback simple check
-            if ip.startswith(('10.', '192.168.')) or ip.startswith('172.'):
-                return True
-            if ip.startswith(('127.', '169.254.')):
-                return True
-            return False
+            # Fallback simple classification
+            if ip.startswith('127.'):
+                return 'loopback'
+            elif ip.startswith(('10.', '192.168.')) or ip.startswith('172.'):
+                return 'private'
+            elif ip.startswith('169.254.'):
+                return 'link_local'
+            else:
+                return 'public'
 
-    def _identify_service_type(self, port: str) -> str:
-        """Identify service type based on port number"""
+    def _get_public_ip(self) -> Optional[str]:
+        """Get public IP address using external services"""
+        services = [
+            'curl -s ifconfig.me',
+            'curl -s icanhazip.com',
+            'curl -s ipecho.net/plain',
+            'wget -qO- ifconfig.me',
+        ]
+        
+        for service in services:
+            try:
+                returncode, stdout, stderr = self._run_command(service)
+                if returncode == 0 and stdout.strip():
+                    ip = stdout.strip()
+                    # Validate IP format
+                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+                        return ip
+            except:
+                continue
+        return None
+
+    def _identify_service_by_port(self, port: str) -> str:
+        """Identify service name by port number"""
         common_ports = {
             '21': 'FTP', '22': 'SSH', '23': 'Telnet', '25': 'SMTP',
             '53': 'DNS', '80': 'HTTP', '110': 'POP3', '143': 'IMAP',
             '443': 'HTTPS', '993': 'IMAPS', '995': 'POP3S',
             '3306': 'MySQL', '5432': 'PostgreSQL', '1433': 'SQL Server',
-            '27017': 'MongoDB', '6379': 'Redis', '8080': 'HTTP-Alt',
-            '8443': 'HTTPS-Alt', '3389': 'RDP', '5901': 'VNC'
+            '27017': 'MongoDB', '6379': 'Redis', '9200': 'Elasticsearch',
+            '8080': 'HTTP-Alt', '8443': 'HTTPS-Alt', '3389': 'RDP',
+            '5901': 'VNC', '3000': 'Node.js Dev', '4200': 'Angular Dev',
+            '5000': 'Flask Dev', '8000': 'Django Dev', '9000': 'PHP-FPM'
         }
-        return common_ports.get(port, 'Unknown')
+        return common_ports.get(port, f'Unknown (port {port})')
 
-    def _assess_service_risk(self, port: str) -> str:
-        """Assess risk level of exposed service"""
-        high_risk_ports = ['23', '21', '3306', '5432', '1433', '27017', '2375']
-        medium_risk_ports = ['22', '3389', '6379', '9200', '8080']
-        
-        if port in high_risk_ports:
-            return 'HIGH'
-        elif port in medium_risk_ports:
-            return 'MEDIUM'
-        else:
-            return 'LOW'
+    def _run_command(self, command: str) -> tuple:
+        """Execute a shell command and return output"""
+        try:
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=30
+            )
+            return result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return -1, "", "Command timed out"
+        except Exception as e:
+            return -1, "", str(e)
 
-    def _check_unusual_network_configs(self):
-        """Check for unusual network configurations"""
-        # Check for multiple default routes
-        cmd = "ip route show default 2>/dev/null || route -n 2>/dev/null | grep '^0.0.0.0'"
-        returncode, stdout, stderr = self.run_command(cmd)
+
+    # Integration example with existing VigileGuard
+    def integrate_with_vigileguard():
+        """
+        Example of how to integrate this enhanced checker with existing VigileGuard
+        """
+        # Add this to your existing AuditEngine class
+        enhanced_checker = EnhancedNetworkExposureChecker()
         
-        if returncode == 0 and stdout:
-            default_routes = [line for line in stdout.split('\n') if line.strip()]
-            if len(default_routes) > 1:
-                self.add_finding(
-                    category="Network Configuration",
-                    severity=SeverityLevel.MEDIUM,
-                    title="Multiple default routes detected",
-                    description=f"Found {len(default_routes)} default routes. This may cause routing issues.",
-                    recommendation="Review routing table and ensure only one default route is configured unless multiple gateways are intended.",
-                    details={"default_routes": default_routes}
-                )
+        # Run the enhanced check
+        findings = enhanced_checker.check()
+        
+        # Get server summary for report header
+        server_summary = enhanced_checker.get_server_summary()
+        
+        return findings, server_summary
+
+
+# Enhanced HTML Report Generator with Server Information
+class EnhancedHTMLReporter:
+    """Enhanced HTML reporter that includes comprehensive server information"""
+    
+    def __init__(self, findings: List[Finding], server_summary: Dict[str, Any]):
+        self.findings = findings
+        self.server_summary = server_summary
+    
+    def generate_enhanced_header(self) -> str:
+        """Generate enhanced header with server information"""
+        return f"""
+        <div class="server-info-header">
+            <div class="server-card">
+                <h2>🖥️ Server Information</h2>
+                <div class="server-details">
+                    <div class="detail-item">
+                        <strong>Primary IP:</strong> {self.server_summary.get('primary_ip', 'Unknown')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Domain:</strong> {self.server_summary.get('primary_domain', 'No domain configured')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Web Server:</strong> {self.server_summary.get('primary_web_server', 'None detected')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Languages:</strong> {', '.join(self.server_summary.get('primary_languages', ['None detected']))}
+                    </div>
+                    <div class="detail-item">
+                        <strong>OS:</strong> {self.server_summary.get('os_info', 'Unknown')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Hostname:</strong> {self.server_summary.get('hostname', 'Unknown')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Network Services:</strong> {self.server_summary.get('total_services', 0)}
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    def generate_enhanced_css(self) -> str:
+        """Generate CSS for enhanced server information display"""
+        return """
+        .server-info-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .server-card {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .server-card h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2rem;
+        }
+        
+        .server-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .detail-item strong {
+            color: #fff;
+            display: inline-block;
+            min-width: 120px;
+        }
+        
+        @media (max-width: 768px) {
+            .server-details {
+                grid-template-columns: 1fr;
+            }
+        }
+        """
+
+
+# Example usage and integration
+if __name__ == "__main__":
+    # Create enhanced checker
+    checker = EnhancedNetworkExposureChecker()
+    
+    # Run comprehensive check
+    findings = checker.check()
+    
+    # Get server summary
+    server_summary = checker.get_server_summary()
+    
+    # Display results
+    print("\n" + "="*60)
+    print("🛡️ ENHANCED VIGILEGUARD NETWORK & SERVER ANALYSIS")
+    print("="*60)
+    
+    print(f"\n📊 SERVER SUMMARY:")
+    print(f"Primary IP: {server_summary.get('primary_ip', 'Unknown')}")
+    print(f"Domain: {server_summary.get('primary_domain', 'No domain configured')}")
+    print(f"Web Server: {server_summary.get('primary_web_server', 'None detected')}")
+    print(f"Languages: {', '.join(server_summary.get('primary_languages', ['None detected']))}")
+    print(f"OS: {server_summary.get('os_info', 'Unknown')}")
+    print(f"Total Services: {server_summary.get('total_services', 0)}")
+    
+    print(f"\n🔍 SECURITY FINDINGS ({len(findings)} total):")
+    for finding in findings:
+        print(f"\n[{finding.severity.value}] {finding.category}: {finding.title}")
+        print(f"  → {finding.description}")
+        if finding.details:
+            print(f"  → Details: {len(finding.details)} items")
+    
+    print("\n" + "="*60)
+    print("✅ Enhanced analysis completed!")
+    print("="*60)
+
 
 class AuditEngine:
     def __init__(self, config_file: Optional[str] = None):
@@ -1654,9 +2136,10 @@ class AuditEngine:
             UserAccountChecker(), 
             SSHConfigChecker(),
             SystemInfoChecker(),
-            NetworkExposureChecker()
+            NetworkExposureChecker()  # This is your enhanced NetworkExposureChecker
         ]
         self.all_findings: List[Finding] = []
+        self.server_summary = {}  # Will store server information
         
         # Try to add Phase 2 checkers if available
         self.phase2_available = False
@@ -1674,7 +2157,7 @@ class AuditEngine:
                     web_checkers = (WebServerSecurityChecker, NetworkSecurityChecker)
                 except ImportError:
                     # Try importing from current directory
-                    import importlib.util
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
                     spec = importlib.util.spec_from_file_location(
                         "web_security_checkers", 
                         os.path.join(current_dir, "web_security_checkers.py")
@@ -1738,7 +2221,7 @@ class AuditEngine:
         return default_config
     
     def run_audit(self) -> List[Finding]:
-        """Run all security checks"""
+        """Run all security checks and collect server information"""
         if RICH_AVAILABLE:
             console.print(Panel.fit("🛡️ VigileGuard Security Audit", style="bold blue"))
             console.print(f"Starting audit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1774,6 +2257,12 @@ class AuditEngine:
                 except Exception as e:
                     print(f"❌ Error in {checker.__class__.__name__}: {e}")
         
+        # Extract server summary from NetworkExposureChecker
+        for checker in self.checkers:
+            if isinstance(checker, NetworkExposureChecker):
+                self.server_summary = checker.get_server_summary()
+                break
+        
         return self.all_findings
     
     def generate_report(self, format_type: str = "console") -> str:
@@ -1795,7 +2284,7 @@ class AuditEngine:
                         from enhanced_reporting import HTMLReporter
                         enhanced_reporting = HTMLReporter
                     except ImportError:
-                        import importlib.util
+                        current_dir = os.path.dirname(os.path.abspath(__file__))
                         spec = importlib.util.spec_from_file_location(
                             "enhanced_reporting", 
                             os.path.join(current_dir, "enhanced_reporting.py")
@@ -1806,7 +2295,7 @@ class AuditEngine:
                             enhanced_reporting = enhanced_mod.HTMLReporter
                 
                 if enhanced_reporting:
-                    html_reporter = enhanced_reporting(self.all_findings, self._get_scan_info())
+                    html_reporter = enhanced_reporting(self.all_findings, self._get_scan_info(), self.server_summary)
                     return html_reporter.generate_report("report.html")
             except ImportError:
                 if RICH_AVAILABLE:
@@ -1818,12 +2307,16 @@ class AuditEngine:
             return self._generate_console_report()
     
     def _generate_console_report(self) -> str:
-        """Generate console-friendly report"""
+        """Generate console-friendly report with server information"""
+        # Display server information first
+        if self.server_summary:
+            self._display_server_summary()
+        
         if RICH_AVAILABLE:
             console.print()
-            console.print(Panel.fit("📊 Audit Results", style="bold green"))
+            console.print(Panel.fit("📊 Security Audit Results", style="bold green"))
         else:
-            print("\n📊 Audit Results")
+            print("\n📊 Security Audit Results")
         
         # Count findings by severity
         severity_counts = {level: 0 for level in SeverityLevel}
@@ -1832,7 +2325,7 @@ class AuditEngine:
         
         if RICH_AVAILABLE:
             # Summary table
-            summary_table = Table(title="Summary")
+            summary_table = Table(title="Security Summary")
             summary_table.add_column("Severity", style="bold")
             summary_table.add_column("Count", justify="right")
             
@@ -1853,39 +2346,50 @@ class AuditEngine:
             console.print()
         else:
             # Fallback without rich
-            print("\nSummary:")
+            print("\nSecurity Summary:")
             for severity, count in severity_counts.items():
                 if count > 0:
                     print(f"  {severity.value}: {count}")
         
         # Detailed findings
         if self.all_findings:
-            if RICH_AVAILABLE:
-                severity_colors = {
-                    SeverityLevel.CRITICAL: "red",
-                    SeverityLevel.HIGH: "orange1", 
-                    SeverityLevel.MEDIUM: "yellow",
-                    SeverityLevel.LOW: "blue",
-                    SeverityLevel.INFO: "green"
-                }
-                for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
-                    color = severity_colors.get(finding.severity, "white")
-                    
-                    finding_panel = Panel(
-                        f"[bold]{finding.title}[/bold]\n\n"
-                        f"[italic]{finding.description}[/italic]\n\n"
-                        f"💡 [bold]Recommendation:[/bold] {finding.recommendation}",
-                        title=f"[{color}]{finding.severity.value}[/{color}] - {finding.category}",
-                        border_style=color
-                    )
-                    console.print(finding_panel)
-                    console.print()
+            # Filter out INFO findings for console display to focus on security issues
+            security_findings = [f for f in self.all_findings if f.severity != SeverityLevel.INFO]
+            
+            if security_findings:
+                if RICH_AVAILABLE:
+                    console.print("\n🔍 Security Issues Found:")
+                    severity_colors = {
+                        SeverityLevel.CRITICAL: "red",
+                        SeverityLevel.HIGH: "orange1", 
+                        SeverityLevel.MEDIUM: "yellow",
+                        SeverityLevel.LOW: "blue",
+                        SeverityLevel.INFO: "green"
+                    }
+                    for finding in sorted(security_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
+                        color = severity_colors.get(finding.severity, "white")
+                        
+                        finding_panel = Panel(
+                            f"[bold]{finding.title}[/bold]\n\n"
+                            f"[italic]{finding.description}[/italic]\n\n"
+                            f"💡 [bold]Recommendation:[/bold] {finding.recommendation}",
+                            title=f"[{color}]{finding.severity.value}[/{color}] - {finding.category}",
+                            border_style=color
+                        )
+                        console.print(finding_panel)
+                        console.print()
+                else:
+                    # Fallback without rich
+                    print("\n🔍 Security Issues Found:")
+                    for finding in sorted(security_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
+                        print(f"\n[{finding.severity.value}] {finding.category}: {finding.title}")
+                        print(f"Description: {finding.description}")
+                        print(f"Recommendation: {finding.recommendation}")
             else:
-                # Fallback without rich
-                for finding in sorted(self.all_findings, key=lambda x: list(SeverityLevel).index(x.severity)):
-                    print(f"\n[{finding.severity.value}] {finding.category}: {finding.title}")
-                    print(f"Description: {finding.description}")
-                    print(f"Recommendation: {finding.recommendation}")
+                if RICH_AVAILABLE:
+                    console.print("✅ No security issues found!", style="bold green")
+                else:
+                    print("✅ No security issues found!")
         else:
             if RICH_AVAILABLE:
                 console.print("✅ No security issues found!", style="bold green")
@@ -1894,10 +2398,42 @@ class AuditEngine:
         
         return ""
     
+    def _display_server_summary(self):
+        """Display server summary in console"""
+        if RICH_AVAILABLE:
+            from rich.panel import Panel
+            from rich.text import Text
+            
+            server_text = Text()
+            server_text.append("🖥️ SERVER INFORMATION\n", style="bold blue")
+            server_text.append(f"Primary IP: {self.server_summary.get('primary_ip', 'Unknown')}\n")
+            server_text.append(f"Domain: {self.server_summary.get('primary_domain', 'No domain configured')}\n")
+            server_text.append(f"Web Server: {self.server_summary.get('primary_web_server', 'None detected')}\n")
+            server_text.append(f"Languages: {', '.join(self.server_summary.get('primary_languages', ['None detected']))}\n")
+            server_text.append(f"OS: {self.server_summary.get('os_info', 'Unknown')}\n")
+            server_text.append(f"Hostname: {self.server_summary.get('hostname', 'Unknown')}\n")
+            server_text.append(f"Network Services: {self.server_summary.get('total_services', 0)}")
+            
+            console.print(Panel(server_text, title="Server Overview", border_style="blue"))
+            console.print()
+        else:
+            print("\n" + "="*60)
+            print("🖥️ SERVER INFORMATION")
+            print("="*60)
+            print(f"Primary IP: {self.server_summary.get('primary_ip', 'Unknown')}")
+            print(f"Domain: {self.server_summary.get('primary_domain', 'No domain configured')}")
+            print(f"Web Server: {self.server_summary.get('primary_web_server', 'None detected')}")
+            print(f"Languages: {', '.join(self.server_summary.get('primary_languages', ['None detected']))}")
+            print(f"OS: {self.server_summary.get('os_info', 'Unknown')}")
+            print(f"Hostname: {self.server_summary.get('hostname', 'Unknown')}")
+            print(f"Network Services: {self.server_summary.get('total_services', 0)}")
+            print("="*60)
+    
     def _generate_json_report(self) -> str:
-        """Generate JSON report"""
+        """Generate JSON report with server information"""
         report = {
             "scan_info": self._get_scan_info(),
+            "server_summary": self.server_summary,
             "summary": {
                 "total_findings": len(self.all_findings),
                 "by_severity": {}
@@ -1911,7 +2447,9 @@ class AuditEngine:
             report["summary"]["by_severity"][severity] = report["summary"]["by_severity"].get(severity, 0) + 1
         
         return json.dumps(report, indent=2)
+    
 
+    
 @click.command()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--output', '-o', help='Output file path')
