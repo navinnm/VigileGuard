@@ -75,7 +75,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY vigileguard/ ./vigileguard/
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
-COPY examples/ ./examples/
+
 
 # Install VigileGuard in development mode
 RUN pip install --no-cache-dir -e ".[dev,full]"
