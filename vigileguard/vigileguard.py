@@ -1216,6 +1216,436 @@ class SystemInfoChecker(SecurityChecker):
                         details={"service": service}
                     )
 
+class NetworkExposureChecker(SecurityChecker):
+    """Check for IP exposure and network security issues"""
+
+    def __init__(self):
+        super().__init__()
+        self.public_ip_ranges = [
+            # These are examples - in practice, you'd check against actual public ranges
+            "0.0.0.0/0",  # Default route
+        ]
+        self.private_ip_ranges = [
+            "10.0.0.0/8",
+            "172.16.0.0/12", 
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "169.254.0.0/16"
+        ]
+
+    def check(self) -> List[Finding]:
+        """Run network exposure checks"""
+        if RICH_AVAILABLE:
+            console.print("🌍 Checking network exposure and IP configuration...", style="yellow")
+        else:
+            print("🌍 Checking network exposure and IP configuration...")
+
+        # Check for public IP exposure
+        self._check_public_ip_exposure()
+        
+        # Check for exposed services on public interfaces
+        self._check_exposed_services()
+        
+        # Check network interface configurations
+        self._check_network_interfaces()
+        
+        # Check for IP forwarding
+        self._check_ip_forwarding()
+        
+        # Check for exposed databases
+        self._check_exposed_databases()
+        
+        # Check for cloud metadata exposure
+        self._check_cloud_metadata_exposure()
+
+        return self.findings
+
+    def _check_public_ip_exposure(self):
+        """Check for services exposed on public IP addresses"""
+        if RICH_AVAILABLE:
+            console.print("  🔍 Checking public IP exposure...", style="blue")
+        else:
+            print("  🔍 Checking public IP exposure...")
+
+        # Get network interfaces and their IPs
+        cmd = "ip addr show 2>/dev/null || ifconfig 2>/dev/null"
+        returncode, stdout, stderr = self.run_command(cmd)
+        
+        public_ips = []
+        interface_info = {}
+        
+        if returncode == 0 and stdout:
+            lines = stdout.split('\n')
+            current_interface = None
+            
+            for line in lines:
+                # Parse interface names
+                if line.strip() and not line.startswith(' '):
+                    if ':' in line:
+                        current_interface = line.split(':')[1].strip() if len(line.split(':')) > 1 else line.split()[0]
+                        interface_info[current_interface] = {'ips': [], 'status': 'unknown'}
+                
+                # Parse IP addresses
+                if 'inet ' in line and current_interface:
+                    ip_match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', line)
+                    if ip_match:
+                        ip = ip_match.group(1)
+                        interface_info[current_interface]['ips'].append(ip)
+                        
+                        # Check if IP is public (simplified check)
+                        if not self._is_private_ip(ip):
+                            public_ips.append({'ip': ip, 'interface': current_interface})
+
+        # Check what services are listening on public IPs
+        exposed_services = []
+        if public_ips:
+            cmd = "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null"
+            returncode, stdout, stderr = self.run_command(cmd)
+            
+            if returncode == 0 and stdout:
+                for line in stdout.split('\n'):
+                    if 'LISTEN' in line or ':' in line:
+                        for pub_ip in public_ips:
+                            if pub_ip['ip'] in line or '0.0.0.0:' in line:
+                                port_match = re.search(r':(\d+)\s', line)
+                                if port_match:
+                                    port = port_match.group(1)
+                                    service_info = {
+                                        'ip': pub_ip['ip'],
+                                        'interface': pub_ip['interface'],
+                                        'port': port,
+                                        'line': line.strip()
+                                    }
+                                    # Determine service type
+                                    service_info['service_type'] = self._identify_service_type(port)
+                                    service_info['risk_level'] = self._assess_service_risk(port)
+                                    exposed_services.append(service_info)
+
+        if public_ips:
+            severity = SeverityLevel.HIGH if exposed_services else SeverityLevel.MEDIUM
+            
+            self.add_finding(
+                category="Network Exposure",
+                severity=severity,
+                title=f"Public IP exposure detected ({len(public_ips)} public IPs)",
+                description=f"Found {len(public_ips)} public IP addresses with {len(exposed_services)} exposed services. " +
+                           "Public IP exposure can make services accessible from the internet, increasing attack surface.",
+                recommendation="Review all publicly exposed services. Use firewalls to restrict access. " +
+                              "Consider using VPN or private networks for sensitive services. " +
+                              "Implement proper access controls and monitoring.",
+                details={
+                    "public_ips": public_ips,
+                    "exposed_services": exposed_services,
+                    "interface_info": interface_info
+                }
+            )
+
+    def _check_exposed_services(self):
+        """Check for high-risk services exposed to public networks"""
+        if RICH_AVAILABLE:
+            console.print("  ⚠️ Checking for exposed high-risk services...", style="blue")
+        else:
+            print("  ⚠️ Checking for exposed high-risk services...")
+
+        # High-risk services that should not be publicly exposed
+        high_risk_services = {
+            '22': {'name': 'SSH', 'risk': 'HIGH', 'reason': 'Remote access protocol'},
+            '23': {'name': 'Telnet', 'risk': 'CRITICAL', 'reason': 'Unencrypted remote access'},
+            '21': {'name': 'FTP', 'risk': 'HIGH', 'reason': 'File transfer protocol'},
+            '3389': {'name': 'RDP', 'risk': 'HIGH', 'reason': 'Windows remote desktop'},
+            '5432': {'name': 'PostgreSQL', 'risk': 'CRITICAL', 'reason': 'Database server'},
+            '3306': {'name': 'MySQL', 'risk': 'CRITICAL', 'reason': 'Database server'},
+            '1433': {'name': 'SQL Server', 'risk': 'CRITICAL', 'reason': 'Database server'},
+            '27017': {'name': 'MongoDB', 'risk': 'CRITICAL', 'reason': 'Database server'},
+            '6379': {'name': 'Redis', 'risk': 'HIGH', 'reason': 'In-memory database'},
+            '9200': {'name': 'Elasticsearch', 'risk': 'HIGH', 'reason': 'Search engine'},
+            '2375': {'name': 'Docker', 'risk': 'CRITICAL', 'reason': 'Container management'},
+            '8080': {'name': 'HTTP Alt', 'risk': 'MEDIUM', 'reason': 'Alternative web server'},
+            '8443': {'name': 'HTTPS Alt', 'risk': 'MEDIUM', 'reason': 'Alternative secure web'},
+        }
+
+        cmd = "netstat -tln 2>/dev/null | grep LISTEN || ss -tln 2>/dev/null"
+        returncode, stdout, stderr = self.run_command(cmd)
+        
+        exposed_risky_services = []
+        all_exposed_ports = []
+        
+        if returncode == 0 and stdout:
+            for line in stdout.split('\n'):
+                if ':' in line:
+                    # Extract listening addresses and ports
+                    parts = line.split()
+                    for part in parts:
+                        if ':' in part and ('0.0.0.0:' in part or '*:' in part or ':::' in part):
+                            port_match = re.search(r':(\d+)$', part)
+                            if port_match:
+                                port = port_match.group(1)
+                                all_exposed_ports.append(port)
+                                
+                                if port in high_risk_services:
+                                    service = high_risk_services[port]
+                                    exposed_risky_services.append({
+                                        'port': port,
+                                        'name': service['name'],
+                                        'risk': service['risk'],
+                                        'reason': service['reason'],
+                                        'binding': part
+                                    })
+
+        if exposed_risky_services:
+            # Determine overall severity
+            has_critical = any(s['risk'] == 'CRITICAL' for s in exposed_risky_services)
+            severity = SeverityLevel.CRITICAL if has_critical else SeverityLevel.HIGH
+            
+            self.add_finding(
+                category="Network Exposure",
+                severity=severity,
+                title=f"High-risk services exposed ({len(exposed_risky_services)} services)",
+                description=f"Found {len(exposed_risky_services)} high-risk services listening on all interfaces. " +
+                           "These services can be accessed from external networks and pose significant security risks.",
+                recommendation="Restrict access to high-risk services using firewalls. " +
+                              "Bind services to localhost (127.0.0.1) when possible. " +
+                              "Use VPN or SSH tunneling for remote access. Implement strong authentication.",
+                details={
+                    "exposed_risky_services": exposed_risky_services,
+                    "all_exposed_ports": all_exposed_ports,
+                    "total_exposed": len(all_exposed_ports)
+                }
+            )
+
+    def _check_network_interfaces(self):
+        """Check network interface configurations"""
+        if RICH_AVAILABLE:
+            console.print("  🔌 Checking network interface configurations...", style="blue")
+        else:
+            print("  🔌 Checking network interface configurations...")
+
+        # Check for promiscuous mode
+        cmd = "ip link show 2>/dev/null || ifconfig 2>/dev/null"
+        returncode, stdout, stderr = self.run_command(cmd)
+        
+        promiscuous_interfaces = []
+        all_interfaces = []
+        
+        if returncode == 0 and stdout:
+            for line in stdout.split('\n'):
+                if 'PROMISC' in line:
+                    interface_match = re.search(r'(\w+):', line)
+                    if interface_match:
+                        promiscuous_interfaces.append(interface_match.group(1))
+                
+                # Collect all interfaces
+                if ':' in line and not line.startswith(' '):
+                    interface_match = re.search(r'(\w+):', line)
+                    if interface_match:
+                        all_interfaces.append(interface_match.group(1))
+
+        if promiscuous_interfaces:
+            self.add_finding(
+                category="Network Exposure",
+                severity=SeverityLevel.MEDIUM,
+                title="Network interfaces in promiscuous mode",
+                description=f"Found {len(promiscuous_interfaces)} interfaces in promiscuous mode: {', '.join(promiscuous_interfaces)}. " +
+                           "Promiscuous mode allows interface to capture all network traffic.",
+                recommendation="Disable promiscuous mode unless required for network monitoring: ip link set <interface> promisc off",
+                details={"promiscuous_interfaces": promiscuous_interfaces}
+            )
+
+        # Check for unusual network configurations
+        self._check_unusual_network_configs()
+
+    def _check_ip_forwarding(self):
+        """Check if IP forwarding is enabled"""
+        if RICH_AVAILABLE:
+            console.print("  🔀 Checking IP forwarding configuration...", style="blue")
+        else:
+            print("  🔀 Checking IP forwarding configuration...")
+
+        forwarding_enabled = []
+        
+        # Check IPv4 forwarding
+        if os.path.exists('/proc/sys/net/ipv4/ip_forward'):
+            try:
+                with open('/proc/sys/net/ipv4/ip_forward', 'r') as f:
+                    if f.read().strip() == '1':
+                        forwarding_enabled.append('IPv4')
+            except (OSError, PermissionError):
+                pass
+
+        # Check IPv6 forwarding
+        if os.path.exists('/proc/sys/net/ipv6/conf/all/forwarding'):
+            try:
+                with open('/proc/sys/net/ipv6/conf/all/forwarding', 'r') as f:
+                    if f.read().strip() == '1':
+                        forwarding_enabled.append('IPv6')
+            except (OSError, PermissionError):
+                pass
+
+        if forwarding_enabled:
+            # Check if this is a router/gateway system
+            cmd = "route -n 2>/dev/null | grep '^0.0.0.0' || ip route show default 2>/dev/null"
+            returncode, stdout, stderr = self.run_command(cmd)
+            
+            is_likely_router = False
+            if returncode == 0 and stdout:
+                # Simple heuristic: multiple network interfaces + default route might indicate router
+                if len(forwarding_enabled) > 0:
+                    is_likely_router = True
+
+            severity = SeverityLevel.MEDIUM if is_likely_router else SeverityLevel.HIGH
+            
+            self.add_finding(
+                category="Network Exposure",
+                severity=severity,
+                title=f"IP forwarding enabled ({', '.join(forwarding_enabled)})",
+                description=f"IP forwarding is enabled for {', '.join(forwarding_enabled)}. " +
+                           "This allows the system to forward packets between network interfaces, " +
+                           "potentially exposing internal networks.",
+                recommendation="Disable IP forwarding if not needed: echo 0 > /proc/sys/net/ipv4/ip_forward. " +
+                              "If this system is a router, ensure proper firewall rules are in place.",
+                details={"forwarding_protocols": forwarding_enabled}
+            )
+
+    def _check_exposed_databases(self):
+        """Check for exposed database services"""
+        if RICH_AVAILABLE:
+            console.print("  🗄️ Checking for exposed database services...", style="blue")
+        else:
+            print("  🗄️ Checking for exposed database services...")
+
+        database_ports = {
+            '3306': 'MySQL',
+            '5432': 'PostgreSQL', 
+            '1433': 'SQL Server',
+            '1521': 'Oracle',
+            '27017': 'MongoDB',
+            '6379': 'Redis',
+            '9042': 'Cassandra',
+            '8086': 'InfluxDB',
+            '9200': 'Elasticsearch'
+        }
+
+        cmd = "netstat -tln 2>/dev/null | grep -E ':(" + "|".join(database_ports.keys()) + ")' || ss -tln 2>/dev/null | grep -E ':(" + "|".join(database_ports.keys()) + ")'"
+        returncode, stdout, stderr = self.run_command(cmd)
+
+        exposed_databases = []
+        if returncode == 0 and stdout:
+            for line in stdout.split('\n'):
+                if line.strip():
+                    for port, db_name in database_ports.items():
+                        if f':{port}' in line:
+                            # Check if exposed on all interfaces
+                            if '0.0.0.0:' in line or '*:' in line or ':::' in line:
+                                exposed_databases.append({
+                                    'port': port,
+                                    'database': db_name,
+                                    'binding': line.strip()
+                                })
+
+        if exposed_databases:
+            self.add_finding(
+                category="Network Exposure",
+                severity=SeverityLevel.CRITICAL,
+                title=f"Database services exposed ({len(exposed_databases)} databases)",
+                description=f"Found {len(exposed_databases)} database services listening on all interfaces. " +
+                           "Exposed databases can lead to data breaches and unauthorized access.",
+                recommendation="Bind database services to localhost (127.0.0.1) or specific internal IPs. " +
+                              "Use firewalls to restrict database access. Implement strong authentication and encryption.",
+                details={"exposed_databases": exposed_databases}
+            )
+
+    def _check_cloud_metadata_exposure(self):
+        """Check for cloud metadata service exposure"""
+        if RICH_AVAILABLE:
+            console.print("  ☁️ Checking cloud metadata exposure...", style="blue")
+        else:
+            print("  ☁️ Checking cloud metadata exposure...")
+
+        # Check if cloud metadata service is accessible
+        metadata_endpoints = [
+            "169.254.169.254",  # AWS/Azure/GCP metadata
+            "169.254.169.255",  # Alternative metadata
+        ]
+
+        accessible_metadata = []
+        for endpoint in metadata_endpoints:
+            cmd = f"curl -s --max-time 5 http://{endpoint}/latest/meta-data/ 2>/dev/null || wget -qO- --timeout=5 http://{endpoint}/latest/meta-data/ 2>/dev/null"
+            returncode, stdout, stderr = self.run_command(cmd)
+            
+            if returncode == 0 and stdout.strip():
+                accessible_metadata.append({
+                    'endpoint': endpoint,
+                    'response_preview': stdout[:200] + "..." if len(stdout) > 200 else stdout
+                })
+
+        if accessible_metadata:
+            self.add_finding(
+                category="Network Exposure",
+                severity=SeverityLevel.HIGH,
+                title="Cloud metadata service accessible",
+                description="Cloud metadata service is accessible from this system. " +
+                           "This may expose sensitive cloud configuration and credentials.",
+                recommendation="Ensure proper IMDSv2 configuration on cloud instances. " +
+                              "Restrict metadata service access using iptables or cloud security groups.",
+                details={"accessible_endpoints": accessible_metadata}
+            )
+
+    def _is_private_ip(self, ip: str) -> bool:
+        """Check if an IP address is private"""
+        try:
+            import ipaddress
+            ip_obj = ipaddress.ip_address(ip)
+            return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local
+        except:
+            # Fallback simple check
+            if ip.startswith(('10.', '192.168.')) or ip.startswith('172.'):
+                return True
+            if ip.startswith(('127.', '169.254.')):
+                return True
+            return False
+
+    def _identify_service_type(self, port: str) -> str:
+        """Identify service type based on port number"""
+        common_ports = {
+            '21': 'FTP', '22': 'SSH', '23': 'Telnet', '25': 'SMTP',
+            '53': 'DNS', '80': 'HTTP', '110': 'POP3', '143': 'IMAP',
+            '443': 'HTTPS', '993': 'IMAPS', '995': 'POP3S',
+            '3306': 'MySQL', '5432': 'PostgreSQL', '1433': 'SQL Server',
+            '27017': 'MongoDB', '6379': 'Redis', '8080': 'HTTP-Alt',
+            '8443': 'HTTPS-Alt', '3389': 'RDP', '5901': 'VNC'
+        }
+        return common_ports.get(port, 'Unknown')
+
+    def _assess_service_risk(self, port: str) -> str:
+        """Assess risk level of exposed service"""
+        high_risk_ports = ['23', '21', '3306', '5432', '1433', '27017', '2375']
+        medium_risk_ports = ['22', '3389', '6379', '9200', '8080']
+        
+        if port in high_risk_ports:
+            return 'HIGH'
+        elif port in medium_risk_ports:
+            return 'MEDIUM'
+        else:
+            return 'LOW'
+
+    def _check_unusual_network_configs(self):
+        """Check for unusual network configurations"""
+        # Check for multiple default routes
+        cmd = "ip route show default 2>/dev/null || route -n 2>/dev/null | grep '^0.0.0.0'"
+        returncode, stdout, stderr = self.run_command(cmd)
+        
+        if returncode == 0 and stdout:
+            default_routes = [line for line in stdout.split('\n') if line.strip()]
+            if len(default_routes) > 1:
+                self.add_finding(
+                    category="Network Configuration",
+                    severity=SeverityLevel.MEDIUM,
+                    title="Multiple default routes detected",
+                    description=f"Found {len(default_routes)} default routes. This may cause routing issues.",
+                    recommendation="Review routing table and ensure only one default route is configured unless multiple gateways are intended.",
+                    details={"default_routes": default_routes}
+                )
+
 class AuditEngine:
     def __init__(self, config_file: Optional[str] = None):
         self.config = self._load_config(config_file)
@@ -1223,7 +1653,8 @@ class AuditEngine:
             FilePermissionChecker(),
             UserAccountChecker(), 
             SSHConfigChecker(),
-            SystemInfoChecker()
+            SystemInfoChecker(),
+            NetworkExposureChecker()
         ]
         self.all_findings: List[Finding] = []
         
