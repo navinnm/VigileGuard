@@ -756,12 +756,12 @@ class Phase2AuditEngine:
         }
         
         if RICH_AVAILABLE:
-            console.print(Panel.fit("🛡️ VigileGuard Phase 2 Security Audit", style="bold blue"))
+            console.print(Panel.fit("🛡️ VigileGuard Security Audit", style="bold blue"))
             console.print(f"Environment: {scan_info['environment']}")
             console.print(f"Starting audit at {scan_info['timestamp']}")
             console.print()
         else:
-            print("🛡️ VigileGuard Phase 2 Security Audit")
+            print("🛡️ VigileGuard Security Audit")
             print(f"Environment: {scan_info['environment']}")
             print(f"Starting audit at {scan_info['timestamp']}")
         
