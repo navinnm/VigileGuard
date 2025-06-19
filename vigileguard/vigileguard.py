@@ -2744,11 +2744,6 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
                 console.print(f"🔔 Webhook notifications enabled", style="blue")
             else:
                 print("🔔 Webhook notifications enabled")
-            phase2_available = False
-            if RICH_AVAILABLE:
-                console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
-            else:
-                print(f"⚠️ Phase 2 components not available: {e}")
         
         # Initialize appropriate engine based on available features
         if phase2_available and phase2_integration:
