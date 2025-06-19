@@ -8,7 +8,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/stargazers)
 [![CI/CD](https://github.com/navinnm/VigileGuard/workflows/VigileGuard%20CI/CD%20Pipeline/badge.svg)](https://github.com/navinnm/VigileGuard/actions)
 [![Security Status](https://img.shields.io/badge/security-monitored-green.svg)](SECURITY.md)
-[![API Status](https://img.shields.io/badge/API-v3.0.6-blue.svg)](api/)
+[![API Status](https://img.shields.io/badge/API-v3.0.7-blue.svg)](api/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](integrations/github_actions/Dockerfile)
 
 **Fast • Developer-Friendly • CI/CD Native • Enterprise-Ready**
@@ -51,7 +51,7 @@ VigileGuard evolves through three phases to become a complete security audit eco
 ### Phase 3 Technical Stack
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    VigileGuard v3.0.6                  │
+│                    VigileGuard v3.0.7                  │
 ├─────────────────────────────────────────────────────────┤
 │  🌐 REST API (FastAPI)                                 │
 │  ├── Authentication (JWT + API Keys)                   │
@@ -173,7 +173,7 @@ pip install -e .
 ### Method 3: Docker Installation
 ```bash
 # Run with Docker
-docker run -p 8000:8000 vigileguard/api:v3.0.6
+docker run -p 8000:8000 vigileguard/api:v3.0.7
 
 # Or use docker-compose
 docker-compose up
@@ -358,10 +358,10 @@ For production deployments or isolated environments:
 
 ```bash
 # Download deployment package
-wget https://github.com/navinnm/VigileGuard/releases/download/v3.0.6/vigileguard-phase3-v3.0.6.tar.gz
+wget https://github.com/navinnm/VigileGuard/releases/download/v3.0.7/vigileguard-phase3-v3.0.7.tar.gz
 
 # Extract and install
-tar -xzf vigileguard-phase3-v3.0.6.tar.gz
+tar -xzf vigileguard-phase3-v3.0.7.tar.gz
 cd vigileguard-phase3-deployment
 bash quickstart.sh
 
@@ -799,7 +799,7 @@ docker-compose up dashboard
 
 ### Single Container
 ```bash
-docker run -p 8000:8000 vigileguard/api:v3.0.6
+docker run -p 8000:8000 vigileguard/api:v3.0.7
 ```
 
 ### Multi-Service Deployment
@@ -808,7 +808,7 @@ docker run -p 8000:8000 vigileguard/api:v3.0.6
 version: '3.8'
 services:
   api:
-    image: vigileguard/api:v3.0.6
+    image: vigileguard/api:v3.0.7
     ports:
       - "8000:8000"
     environment:
@@ -819,7 +819,7 @@ services:
       - redis
 
   dashboard:
-    image: vigileguard/dashboard:v3.0.6
+    image: vigileguard/dashboard:v3.0.7
     ports:
       - "3000:3000"
     environment:
@@ -1043,6 +1043,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**VigileGuard v3.0.6** - Comprehensive Security Audit Engine with API & CI/CD Integration
+**VigileGuard v3.0.7** - Comprehensive Security Audit Engine with API & CI/CD Integration
 
 Made with ❤️ by the VigileGuard Team

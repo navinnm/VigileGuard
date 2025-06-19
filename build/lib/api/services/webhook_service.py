@@ -141,7 +141,7 @@ class WebhookService:
             # Create headers
             headers = {
                 "Content-Type": "application/json",
-                "User-Agent": "VigileGuard-Webhook/3.0.6",
+                "User-Agent": "VigileGuard-Webhook/3.0.7",
                 **webhook.headers
             }
             

@@ -9,7 +9,7 @@ import traceback
 def test_basic_imports():
     """Test basic Python and system imports"""
     print("=== Testing Basic Imports ===")
-    __version__ = "3.0.6"
+    __version__ = "3.0.7"
     print(f"VigileGuard Debug Script Version: {__version__}")
     try:
         import os
