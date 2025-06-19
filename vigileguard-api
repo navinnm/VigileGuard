@@ -1,0 +1,19 @@
+#!/bin/bash
+# VigileGuard API Server wrapper
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
+echo "🛡️  Starting VigileGuard Phase 3 API Server..."
+echo "API Documentation: http://localhost:8000/api/docs"
+echo "Health Check: http://localhost:8000/health"
+echo ""
+
+if command -v python3 &> /dev/null; then
+    python3 -m api
+elif command -v python &> /dev/null; then
+    python -m api
+else
+    echo "Error: Python not found"
+    exit 1
+fi

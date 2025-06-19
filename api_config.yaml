@@ -1,0 +1,22 @@
+# VigileGuard Phase 3 API Configuration
+api:
+  host: "127.0.0.1"
+  port: 8000
+  debug: true
+  
+security:
+  jwt_secret: "rckaVgQNnosElbVyIpZpWotLSWin2XSMIVUURjfY938="
+  jwt_expiry_hours: 24
+  api_key_expiry_days: 365
+  
+scanning:
+  max_concurrent_scans: 5
+  default_timeout: 300
+  
+notifications:
+  webhook_timeout: 30
+  max_retries: 3
+  
+logging:
+  level: "INFO"
+  file: "logs/vigileguard_api.log"

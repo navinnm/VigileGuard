@@ -1,0 +1,14 @@
+#!/bin/bash
+# VigileGuard CLI wrapper with Phase 3 support
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
+if command -v python3 &> /dev/null; then
+    python3 -m vigileguard.vigileguard "$@"
+elif command -v python &> /dev/null; then
+    python -m vigileguard.vigileguard "$@"
+else
+    echo "Error: Python not found"
+    exit 1
+fi
