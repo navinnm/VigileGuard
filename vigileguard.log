@@ -8,3 +8,19 @@
 2025-06-19 19:04:35,704 - vigileguard.phase2_integration - INFO - Phase 2 checkers loaded successfully
 2025-06-19 19:07:31,425 - vigileguard.phase2_integration - INFO - Phase 1 checkers loaded successfully
 2025-06-19 19:07:31,426 - vigileguard.phase2_integration - INFO - Phase 2 checkers loaded successfully
+2025-06-19 19:27:58,058 - vigileguard.phase2_integration - INFO - Phase 1 checkers loaded successfully
+2025-06-19 19:27:58,059 - vigileguard.phase2_integration - INFO - Phase 2 checkers loaded successfully
+2025-06-19 19:27:58,068 - vigileguard.phase2_integration - INFO - Container security checker loaded successfully
+2025-06-19 19:27:58,116 - vigileguard.phase2_integration - INFO - Database security checker loaded successfully
+2025-06-19 19:27:58,123 - vigileguard.phase2_integration - INFO - Process & service security checker loaded successfully
+2025-06-19 19:27:58,125 - vigileguard.phase2_integration - INFO - Environment security checker loaded successfully
+2025-06-19 19:29:03,906 - vigileguard.phase2_integration - ERROR - Error in ContainerSecurityChecker: 
+2025-06-19 19:29:03,908 - vigileguard.phase2_integration - ERROR - Error in DatabaseSecurityChecker: 
+2025-06-19 19:29:03,911 - vigileguard.phase2_integration - ERROR - Error in ProcessServiceSecurityChecker: 
+2025-06-19 19:29:03,912 - vigileguard.phase2_integration - ERROR - Error in EnvironmentSecurityChecker: 
+2025-06-19 19:38:04,322 - vigileguard.phase2_integration - INFO - Phase 1 checkers loaded successfully
+2025-06-19 19:38:04,323 - vigileguard.phase2_integration - INFO - Phase 2 checkers loaded successfully
+2025-06-19 19:38:04,330 - vigileguard.phase2_integration - INFO - Container security checker loaded successfully
+2025-06-19 19:38:04,372 - vigileguard.phase2_integration - INFO - Database security checker loaded successfully
+2025-06-19 19:38:04,383 - vigileguard.phase2_integration - INFO - Process & service security checker loaded successfully
+2025-06-19 19:38:04,387 - vigileguard.phase2_integration - INFO - Environment security checker loaded successfully

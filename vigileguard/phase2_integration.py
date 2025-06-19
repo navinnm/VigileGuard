@@ -742,6 +742,35 @@ class Phase2AuditEngine:
         except ImportError as e:
             self.logger.warning(f"Could not import Phase 2 checkers: {e}")
         
+        # Phase 3 enhanced checkers (new security domains)
+        try:
+            from container_security_checkers import ContainerSecurityChecker
+            checkers.append(ContainerSecurityChecker())
+            self.logger.info("Container security checker loaded successfully")
+        except ImportError as e:
+            self.logger.warning(f"Could not import container security checker: {e}")
+        
+        try:
+            from database_security_checkers import DatabaseSecurityChecker
+            checkers.append(DatabaseSecurityChecker())
+            self.logger.info("Database security checker loaded successfully")
+        except ImportError as e:
+            self.logger.warning(f"Could not import database security checker: {e}")
+        
+        try:
+            from process_security_checkers import ProcessServiceSecurityChecker
+            checkers.append(ProcessServiceSecurityChecker())
+            self.logger.info("Process & service security checker loaded successfully")
+        except ImportError as e:
+            self.logger.warning(f"Could not import process security checker: {e}")
+        
+        try:
+            from environment_security_checkers import EnvironmentSecurityChecker
+            checkers.append(EnvironmentSecurityChecker())
+            self.logger.info("Environment security checker loaded successfully")
+        except ImportError as e:
+            self.logger.warning(f"Could not import environment security checker: {e}")
+        
         return checkers
     
     def run_audit(self) -> List[Finding]:

@@ -4,3 +4,5 @@
 __pycache__/
 vigileguard.egg-info/
 dist/
+vigileguard_trends/
+reports/
