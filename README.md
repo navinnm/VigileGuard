@@ -145,31 +145,84 @@ VigileGuard/
 └── CLAUDE.md                        # Development roadmap
 ```
 
-## 🚀 Quick Start
+## 📦 Installation
 
-### Option 1: Local Scanning (Phase 1 & 2)
+### Method 1: Install from PyPI (Recommended)
+```bash
+# Install latest stable version
+pip install vigileguard
+
+# Verify installation
+vigileguard --version
+
+# Run your first scan
+vigileguard
+```
+
+### Method 2: Install from GitHub
+```bash
+# Install latest development version
+pip install git+https://github.com/navinnm/VigileGuard.git
+
+# Or clone and install locally
+git clone https://github.com/navinnm/VigileGuard.git
+cd VigileGuard
+pip install -e .
+```
+
+### Method 3: Docker Installation
+```bash
+# Run with Docker
+docker run -p 8000:8000 vigileguard/api:v3.0.3
+
+# Or use docker-compose
+docker-compose up
+```
+
+### Method 4: Development Installation
 ```bash
 # Clone repository
 git clone https://github.com/navinnm/VigileGuard.git
 cd VigileGuard
 
-# Install dependencies
-pip install -r requirements.txt
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install in development mode
+pip install -e .[dev]
+```
+
+## 🚀 Quick Start
+
+### Option 1: Local Scanning (Phase 1 & 2)
+```bash
+# Install VigileGuard
+pip install vigileguard
 
 # Run basic scan
-python -m vigileguard.vigileguard
+vigileguard
 
 # Generate JSON report
-python -m vigileguard.vigileguard --format json --output scan_report.json
+vigileguard --format json --output scan_report.json
 
 # Run with notifications
-python -m vigileguard.vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL
+vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL
+
+# Show all available options
+vigileguard --help
 ```
 
 ### Option 2: API Server (Phase 3)
 ```bash
+# Install VigileGuard
+pip install vigileguard
+
 # Start the API server
-python -m api.main
+vigileguard-api
+
+# Or using Python module
+python -m api
 
 # API will be available at http://localhost:8000
 # Interactive docs at http://localhost:8000/api/docs
@@ -177,11 +230,14 @@ python -m api.main
 
 ### Option 3: Remote Scanning via API
 ```bash
+# Install VigileGuard
+pip install vigileguard
+
 # Scan remote target via API
-python -m vigileguard.vigileguard --target server.example.com --api-mode
+vigileguard --target server.example.com --api-mode
 
 # With custom API endpoint and authentication
-python -m vigileguard.vigileguard \
+vigileguard \
   --target server.example.com \
   --api-endpoint https://vigileguard-api.company.com/api/v1 \
   --api-key your-api-key \
@@ -200,25 +256,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: VigileGuard Security Scan
-        uses: your-org/vigileguard-action@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          target: 'production.example.com'
-          fail-on-critical: true
-          comment-pr: true
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          python-version: '3.8'
+      
+      - name: Install VigileGuard
+        run: pip install vigileguard
+      
+      - name: Run Security Scan
+        run: |
+          vigileguard --format json --output scan-results.json
+          vigileguard --webhook-url ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          VIGILEGUARD_ENV: production
 ```
 
-## 🔧 Installation
+## 🔧 Advanced Installation
 
 ### Prerequisites
 - Python 3.8+
 - Linux/Unix system (for local scanning)
 - Docker (optional, for containerized deployment)
 
-### Installation Methods
+### Development Installation (Advanced Users)
 
-#### Method 1: Quick Installation with Phase 3 (Recommended)
+#### Method 1: Full Source Installation with Phase 3
 ```bash
 # Clone repository
 git clone https://github.com/navinnm/VigileGuard.git
@@ -232,23 +295,21 @@ bash install_phase3.sh
 ./vigileguard-api &  # Start API server
 ```
 
-#### Method 2: Manual Installation
+#### Method 2: Manual Development Setup
 ```bash
 # Clone repository
 git clone https://github.com/navinnm/VigileGuard.git
 cd VigileGuard
 
-# Install base dependencies
-pip3 install -r requirements.txt
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-# Install Phase 3 API dependencies
-pip3 install fastapi uvicorn pydantic python-multipart aiofiles httpx
-
-# Install in development mode
-pip3 install -e .
+# Install in development mode with all extras
+pip3 install -e .[dev,api,ci]
 
 # Test Phase 1 & 2
-python3 -m vigileguard.vigileguard
+vigileguard
 
 # Test Phase 3 API
 python3 -c "import api.main; print('✅ Phase 3 API OK')"
