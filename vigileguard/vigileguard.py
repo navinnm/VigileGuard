@@ -6,7 +6,7 @@ A comprehensive security audit tool for Linux systems with API and CI/CD integra
 Repository: https://github.com/navinnm/VigileGuard
 Author: VigileGuard Development Team
 License: MIT
-Version: 3.0.6
+Version: 3.0.7
 
 Features:
 - Comprehensive security scanning (Phase 1)
@@ -60,7 +60,7 @@ except ImportError as e:
         def fit(text, **kwargs):
             return text
 
-__version__ = "3.0.6"
+__version__ = "3.0.7"
 
 # Global console for rich output
 console = Console()
@@ -2163,7 +2163,7 @@ class AuditEngine:
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.6' if getattr(self, 'phase2_available', False) else __version__,
+            'version': '3.0.7' if getattr(self, 'phase2_available', False) else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -2193,6 +2193,99 @@ class AuditEngine:
                     print(f"Warning: Could not load config file: {e}")
         
         return default_config
+    
+    def get_unified_server_info(self):
+        """Unified server information detection - no Phase 1/2 separation"""
+        import socket
+        import platform
+        import subprocess
+        import re
+        
+        # Get basic system info
+        hostname = socket.gethostname()
+        try:
+            primary_ip = socket.gethostbyname(hostname)
+        except:
+            primary_ip = '127.0.0.1'
+        
+        # Try to get public IP
+        public_ip = primary_ip
+        try:
+            # Try common methods to get public IP
+            result = subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                public_ip = result.stdout.strip()
+        except:
+            try:
+                result = subprocess.run(['wget', '-qO-', 'ifconfig.me'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    public_ip = result.stdout.strip()
+            except:
+                pass
+        
+        # Detect web servers
+        web_servers = []
+        try:
+            # Check for Apache
+            result = subprocess.run(['apache2', '-v'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'Apache/([0-9.]+)', result.stdout)
+                version = version_match.group(1) if version_match else 'Unknown'
+                web_servers.append({'name': 'Apache', 'version': version})
+        except:
+            pass
+        
+        try:
+            # Check for Nginx
+            result = subprocess.run(['nginx', '-v'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'nginx/([0-9.]+)', result.stderr)
+                version = version_match.group(1) if version_match else 'Unknown'
+                web_servers.append({'name': 'Nginx', 'version': version})
+        except:
+            pass
+        
+        # Detect programming languages
+        languages = {'Python': {'version': platform.python_version()}}
+        
+        # Check for Node.js
+        try:
+            result = subprocess.run(['node', '--version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                languages['Node.js'] = {'version': result.stdout.strip().lstrip('v')}
+        except:
+            pass
+        
+        # Check for PHP
+        try:
+            result = subprocess.run(['php', '--version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'PHP ([0-9.]+)', result.stdout)
+                if version_match:
+                    languages['PHP'] = {'version': version_match.group(1)}
+        except:
+            pass
+        
+        # Get OS info
+        os_info = f"{platform.system()} {platform.release()}"
+        
+        return {
+            'hostname': hostname,
+            'primary_ip': public_ip,
+            'primary_domain': hostname if '.' in hostname else 'localhost',
+            'primary_web_server': web_servers[0]['name'] if web_servers else 'Not detected',
+            'primary_languages': list(languages.keys())[:3],
+            'total_services': len(web_servers),
+            'os_info': os_info,
+            'server_info': {
+                'ip_addresses': {'eth0': {'ips': [{'ip': public_ip, 'type': 'public'}], 'status': 'UP'}},
+                'domain_names': [],
+                'web_servers': web_servers,
+                'installed_languages': languages,
+                'network_services': [],
+                'system_info': {'pretty_name': os_info}
+            }
+        }
     
     def run_audit(self) -> List[Finding]:
         """Run all security checks and collect server information"""
@@ -2231,11 +2324,8 @@ class AuditEngine:
                 except Exception as e:
                     print(f"❌ Error in {checker.__class__.__name__}: {e}")
         
-        # Extract server summary from NetworkExposureChecker
-        for checker in self.checkers:
-            if isinstance(checker, NetworkExposureChecker):
-                self.server_summary = checker.get_server_summary()
-                break
+        # Generate unified server summary using the new simplified method
+        self.server_summary = self.get_unified_server_info()
         
         return self.all_findings
     
@@ -2760,7 +2850,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.6' if phase2_available else __version__,
+            'version': '3.0.7' if phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -2793,7 +2883,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
                                 report_manager = enhanced_mod.ReportManager
                     
                     if report_manager:
-                        rm = report_manager(findings, scan_info)
+                        rm = report_manager(findings, scan_info, getattr(engine, 'server_summary', {}))
                         report_content = rm.generate_technical_report()
                     else:
                         report_content = engine.generate_report('json')
@@ -2891,7 +2981,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
                             html_reporter = enhanced_mod.HTMLReporter
                 
                 if html_reporter:
-                    reporter = html_reporter(findings, scan_info)
+                    reporter = html_reporter(findings, scan_info, getattr(engine, 'server_summary', {}))
                     output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
                     reporter.generate_report(output_file)
                     if RICH_AVAILABLE:
@@ -2957,6 +3047,46 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
                     print("❌ Compliance format requires Phase 2 components")
                 sys.exit(1)
         
+        elif output_format == 'pdf':
+            # PDF output (Phase 2)
+            try:
+                # Try to import PDFReporter
+                pdf_reporter = None
+                try:
+                    from .enhanced_reporting import PDFReporter
+                    pdf_reporter = PDFReporter
+                except ImportError:
+                    try:
+                        from enhanced_reporting import PDFReporter
+                        pdf_reporter = PDFReporter
+                    except ImportError:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            "enhanced_reporting", 
+                            os.path.join(current_dir, "enhanced_reporting.py")
+                        )
+                        if spec and spec.loader:
+                            enhanced_mod = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(enhanced_mod)
+                            pdf_reporter = enhanced_mod.PDFReporter
+                
+                if pdf_reporter:
+                    reporter = pdf_reporter(findings, scan_info, getattr(engine, 'server_summary', {}))
+                    output_file = output or f"vigileguard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                    result_file = reporter.generate_report(output_file)
+                    if RICH_AVAILABLE:
+                        console.print(f"PDF report saved to {result_file}", style="green")
+                    else:
+                        print(f"PDF report saved to {result_file}")
+                else:
+                    raise ImportError("PDFReporter not available")
+            except ImportError:
+                if RICH_AVAILABLE:
+                    console.print("❌ PDF format requires Phase 2 components", style="red")
+                else:
+                    print("❌ PDF format requires Phase 2 components")
+                sys.exit(1)
+        
         elif output_format == 'all':
             if not phase2_available:
                 if RICH_AVAILABLE:
@@ -2988,7 +3118,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
                             report_manager = enhanced_mod.ReportManager
                 
                 if report_manager:
-                    rm = report_manager(findings, scan_info)
+                    rm = report_manager(findings, scan_info, getattr(engine, 'server_summary', {}))
                     output_dir = output or './reports'
                     generated_files = rm.generate_all_formats(output_dir)
                     

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VigileGuard Security Report - Security Audit</title>
+    <title>VigileGuard Security Report - localhost</title>
     <style>
         
         * {
@@ -566,14 +566,78 @@
     <div class="container">
         <!-- Enhanced Server Information Header -->
         
+        <div class="server-info-header">
+            <div class="server-card">
+                <h2>🖥️ Server Information</h2>
+                <div class="server-details">
+                    <div class="detail-item">
+                        <span class="detail-icon">🌐</span>
+                        <div class="detail-content">
+                            <strong>Primary IP:</strong>
+                            <span class="detail-value">2400:8904::f03c:93ff:fe48:72fd</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🏷️</span>
+                        <div class="detail-content">
+                            <strong>Domain:</strong>
+                            <span class="detail-value">localhost</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🖥️</span>
+                        <div class="detail-content">
+                            <strong>Web Server:</strong>
+                            <span class="detail-value">Apache</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">💻</span>
+                        <div class="detail-content">
+                            <strong>Languages:</strong>
+                            <span class="detail-value">Python, Node.js, PHP</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🐧</span>
+                        <div class="detail-content">
+                            <strong>Operating System:</strong>
+                            <span class="detail-value">Linux 5.15.0-141-generic</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🏠</span>
+                        <div class="detail-content">
+                            <strong>Hostname:</strong>
+                            <span class="detail-value">localhost</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🔌</span>
+                        <div class="detail-content">
+                            <strong>Network Services:</strong>
+                            <span class="detail-value">1</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">📡</span>
+                        <div class="detail-content">
+                            <strong>IP Addresses:</strong>
+                            <span class="detail-value">1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         
         <!-- Main Header -->
         <header class="main-header">
             <h1>🛡️ VigileGuard Security Report</h1>
-            <small>Powered by Fulgid v3.0.5</small>
+            <small>Powered by Fulgid v3.0.6</small>
             <div class="scan-info">
-                <p><strong>Scan Date:</strong> 2025-06-19T19:07:31.426718</p>
-                <p><strong>Tool Version:</strong> 3.0.5</p>
+                <p><strong>Scan Date:</strong> 2025-06-19T23:06:21.828221</p>
+                <p><strong>Tool Version:</strong> 3.0.6</p>
                 <p><strong>Repository:</strong> <a href="https://github.com/navinnm/VigileGuard">GitHub</a></p>
             </div>
         </header>
@@ -584,7 +648,7 @@
         <div class="summary-cards">
             <div class="summary-card total">
                 <h3>Total Findings</h3>
-                <div class="number">28</div>
+                <div class="number">41</div>
             </div>
             <div class="summary-card risk-high">
                 <h3>Risk Level</h3>
@@ -592,11 +656,45 @@
             </div>
             <div class="summary-card critical">
                 <h3>Critical/High</h3>
-                <div class="number">10</div>
+                <div class="number">12</div>
             </div>
         </div>
         
         
+            <div class="server-metrics">
+                <h3>📊 Server Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-icon">🌐</span>
+                        <div class="metric-content">
+                            <span class="metric-label">Network Interfaces</span>
+                            <span class="metric-value">1</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-icon">🏷️</span>
+                        <div class="metric-content">
+                            <span class="metric-label">Domain Names</span>
+                            <span class="metric-value">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-icon">🖥️</span>
+                        <div class="metric-content">
+                            <span class="metric-label">Web Servers</span>
+                            <span class="metric-value">1</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-icon">💻</span>
+                        <div class="metric-content">
+                            <span class="metric-label">Programming Languages</span>
+                            <span class="metric-value">3</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
         
         <div class="severity-breakdown">
             <h3>Severity Breakdown</h3>
@@ -609,12 +707,12 @@
             
                 <div class="severity-item">
                     <span class="severity-badge" style="background-color: #fd7e14;">HIGH</span>
-                    <span class="severity-count">9</span>
+                    <span class="severity-count">11</span>
                 </div>
             
                 <div class="severity-item">
                     <span class="severity-badge" style="background-color: #ffc107;">MEDIUM</span>
-                    <span class="severity-count">8</span>
+                    <span class="severity-count">15</span>
                 </div>
             
                 <div class="severity-item">
@@ -624,7 +722,7 @@
             
                 <div class="severity-item">
                     <span class="severity-badge" style="background-color: #6c757d;">INFO</span>
-                    <span class="severity-count">7</span>
+                    <span class="severity-count">11</span>
                 </div>
             
             </div>
@@ -669,7 +767,7 @@
         </div>
         </div>
                     <div class="severity-section">
-                        <h3 class="severity-header severity-high">HIGH Issues (9)</h3>
+                        <h3 class="severity-header severity-high">HIGH Issues (11)</h3>
                     
         <div class="finding-card severity-high">
             <div class="finding-header">
@@ -835,9 +933,47 @@
             </div>
             
         </div>
+        
+        <div class="finding-card severity-high">
+            <div class="finding-header">
+                <h4>Suspicious processes detected</h4>
+                <span class="severity-badge severity-high">HIGH</span>
+            </div>
+            <div class="finding-category">Category: Process Security</div>
+            <div class="finding-description">Found 25 suspicious running processes</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Investigate suspicious processes and terminate if malicious
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>suspicious_processes:</strong> 10 items</li><li><strong>total_count:</strong> 25</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-high">
+            <div class="finding-header">
+                <h4>Secrets in environment files</h4>
+                <span class="severity-badge severity-high">HIGH</span>
+            </div>
+            <div class="finding-category">Category: Environment Security</div>
+            <div class="finding-description">Found secrets in 3 environment files</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Remove secrets from environment files and use proper secret management
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>files_with_secrets:</strong> 3 items</li><li><strong>total_files_checked:</strong> 7</li></ul>
+                        
+                    </div>
+                    
+        </div>
         </div>
                     <div class="severity-section">
-                        <h3 class="severity-header severity-medium">MEDIUM Issues (8)</h3>
+                        <h3 class="severity-header severity-medium">MEDIUM Issues (15)</h3>
                     
         <div class="finding-card severity-medium">
             <div class="finding-header">
@@ -984,6 +1120,139 @@
                     </div>
                     
         </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Many processes running as root</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Process Security</div>
+            <div class="finding-description">Found 112 processes running as root</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Review processes running as root and apply principle of least privilege
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>root_process_count:</strong> 112</li><li><strong>sample_processes:</strong> 10 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Non-root processes with capabilities</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Process Security</div>
+            <div class="finding-description">Found 4 non-root processes with elevated capabilities</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Review processes with capabilities and ensure they're necessary
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>elevated_processes:</strong> 4 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Services with security hardening opportunities</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Service Security</div>
+            <div class="finding-description">Found 18 services that could be hardened</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Enable systemd security options like PrivateTmp, ProtectSystem, NoNewPrivileges
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>insecure_services:</strong> 10 items</li><li><strong>total_count:</strong> 18</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Many services running as root</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Service Security</div>
+            <div class="finding-description">Found 19 services running as root</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Create dedicated users for services and apply principle of least privilege
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>root_services:</strong> 15 items</li><li><strong>total_count:</strong> 19</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Failed services detected</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Service Security</div>
+            <div class="finding-description">Found 1 failed services</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Investigate and fix failed services to prevent security issues
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>failed_services:</strong> 1 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Potential secrets in environment variables</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Environment Security</div>
+            <div class="finding-description">Found 1 potential secrets in environment variables</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Review environment variables and implement proper secret management
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>potential_secrets:</strong> 1 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-medium">
+            <div class="finding-header">
+                <h4>Environment files detected</h4>
+                <span class="severity-badge severity-medium">MEDIUM</span>
+            </div>
+            <div class="finding-category">Category: Environment Security</div>
+            <div class="finding-description">Found 7 environment files on the system</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Ensure environment files are not exposed and contain no secrets
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>environment_files:</strong> 7 items</li><li><strong>total_count:</strong> 7</li></ul>
+                        
+                    </div>
+                    
+        </div>
         </div>
                     <div class="severity-section">
                         <h3 class="severity-header severity-low">LOW Issues (3)</h3>
@@ -1047,7 +1316,7 @@
         </div>
             <div class="info-section">
                 <h3 class="info-header" onclick="toggleInfoSection()">
-                    📋 System Information (7 items) <span id="info-toggle">▼</span>
+                    📋 System Information (11 items) <span id="info-toggle">▼</span>
                 </h3>
                 <div id="info-content" class="info-content">
             
@@ -1184,6 +1453,82 @@
                     
         </div>
         
+        <div class="finding-card severity-info">
+            <div class="finding-header">
+                <h4>No container runtimes detected</h4>
+                <span class="severity-badge severity-info">INFO</span>
+            </div>
+            <div class="finding-category">Category: Container Security</div>
+            <div class="finding-description">No container runtimes (Docker, Podman) found on system</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Container security checks skipped
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>runtimes:</strong> 0 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-info">
+            <div class="finding-header">
+                <h4>Docker not available</h4>
+                <span class="severity-badge severity-info">INFO</span>
+            </div>
+            <div class="finding-category">Category: Container Security</div>
+            <div class="finding-description">Docker is not installed or not accessible</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Install Docker if containerization is used
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>status:</strong> not_available</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-info">
+            <div class="finding-header">
+                <h4>Podman not available</h4>
+                <span class="severity-badge severity-info">INFO</span>
+            </div>
+            <div class="finding-category">Category: Container Security</div>
+            <div class="finding-description">Podman is not installed or not accessible</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Consider Podman as a rootless container alternative
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>status:</strong> not_available</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
+        <div class="finding-card severity-info">
+            <div class="finding-header">
+                <h4>No database services detected</h4>
+                <span class="severity-badge severity-info">INFO</span>
+            </div>
+            <div class="finding-category">Category: Database Security</div>
+            <div class="finding-description">No database services found running on this system</div>
+            <div class="finding-recommendation">
+                <strong>Recommendation:</strong> Database security checks skipped
+            </div>
+            
+                    <div class="finding-details">
+                        <strong>Details:</strong>
+                        <ul><li><strong>databases:</strong> 0 items</li></ul>
+                        
+                    </div>
+                    
+        </div>
+        
                 </div>
             </div>
             
@@ -1191,9 +1536,89 @@
         
         <!-- Detailed Server Information -->
         
+        <section class="server-details">
+            <h2>📋 Detailed Server Information</h2>
+            
+            <div class="details-grid">
+                <div class="detail-section">
+                    <h3>🌐 Network Configuration</h3>
+                    <div class="detail-content">
+                        
+            <div class='interface-item'>
+                <div class="interface-header">
+                    <strong>eth0</strong>
+                    <span class="status-badge status-up">UP</span>
+                </div>
+            <ul><li class='ip-public'>2400:8904::f03c:93ff:fe48:72fd (public)</li></ul></div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>🌍 Domain Configuration</h3>
+                    <div class="detail-content">
+                        <p>No domains configured</p>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>🖥️ Web Servers</h3>
+                    <div class="detail-content">
+                        
+            <div class='server-item'>
+                <div class="server-header">
+                    <strong>Apache</strong>
+                    <span class="status-badge status-installed">unknown</span>
+                </div>
+                <div class="server-version">Version: 2.4.52</div>
+            </div>
+            
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>💻 Programming Languages</h3>
+                    <div class="detail-content">
+                        
+            <div class='language-item'>
+                <div class="language-header">
+                    <strong>Python</strong>
+                    <span class="version-badge">3.10.12</span>
+                </div>
+            </div>
+            <div class='language-item'>
+                <div class="language-header">
+                    <strong>Node.js</strong>
+                    <span class="version-badge">18.20.8</span>
+                </div>
+            </div>
+            <div class='language-item'>
+                <div class="language-header">
+                    <strong>PHP</strong>
+                    <span class="version-badge">8.2.15</span>
+                </div>
+            </div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>🔌 Network Services</h3>
+                    <div class="detail-content">
+                        <p>No network services detected</p>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>⚙️ System Information</h3>
+                    <div class="detail-content">
+                        <div class='system-info'><div class='system-item'><strong>Operating System:</strong> Linux 5.15.0-141-generic</div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
         
         <footer class="footer">
-            <p>Generated by VigileGuard v3.0.5 | 
+            <p>Generated by VigileGuard v3.0.6 | 
             <a href="https://github.com/navinnm/VigileGuard">GitHub Repository</a></p>
         </footer>
     </div>
@@ -1201,8 +1626,8 @@
     <script>
         
         // Chart.js configuration
-        const severityData = {"CRITICAL": 1, "HIGH": 9, "MEDIUM": 8, "LOW": 3, "INFO": 7};
-        const categoryData = {"File Permissions": 4, "Web Security": 1, "User Accounts": 1, "SSH": 4, "System Info": 2, "Web Server": 10, "SSL/TLS": 2, "Web Application": 1, "Network Security": 3};
+        const severityData = {"CRITICAL": 1, "HIGH": 11, "MEDIUM": 15, "LOW": 3, "INFO": 11};
+        const categoryData = {"File Permissions": 4, "Web Security": 1, "User Accounts": 1, "SSH": 4, "System Info": 2, "Web Server": 10, "SSL/TLS": 2, "Web Application": 1, "Network Security": 3, "Container Security": 3, "Database Security": 1, "Process Security": 3, "Service Security": 3, "Environment Security": 3};
         
         // Only create charts if there's data
         if (Object.keys(severityData).length > 0) {
@@ -1281,6 +1706,20 @@
         function toggleInfoSection() {
             const content = document.getElementById('info-content');
             const toggle = document.getElementById('info-toggle');
+            
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                toggle.textContent = '▼';
+            } else {
+                content.classList.add('show');
+                toggle.textContent = '▲';
+            }
+        }
+        
+        // Toggle affected files section
+        function toggleAffectedFiles() {
+            const content = document.getElementById('affected-files-content');
+            const toggle = document.getElementById('files-toggle');
             
             if (content.classList.contains('show')) {
                 content.classList.remove('show');

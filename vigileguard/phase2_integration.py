@@ -773,12 +773,105 @@ class Phase2AuditEngine:
         
         return checkers
     
+    def get_unified_server_info(self):
+        """Unified server information detection - no Phase 1/2 separation"""
+        import socket
+        import platform
+        import subprocess
+        import re
+        
+        # Get basic system info
+        hostname = socket.gethostname()
+        try:
+            primary_ip = socket.gethostbyname(hostname)
+        except:
+            primary_ip = '127.0.0.1'
+        
+        # Try to get public IP
+        public_ip = primary_ip
+        try:
+            # Try common methods to get public IP
+            result = subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                public_ip = result.stdout.strip()
+        except:
+            try:
+                result = subprocess.run(['wget', '-qO-', 'ifconfig.me'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    public_ip = result.stdout.strip()
+            except:
+                pass
+        
+        # Detect web servers
+        web_servers = []
+        try:
+            # Check for Apache
+            result = subprocess.run(['apache2', '-v'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'Apache/([0-9.]+)', result.stdout)
+                version = version_match.group(1) if version_match else 'Unknown'
+                web_servers.append({'name': 'Apache', 'version': version})
+        except:
+            pass
+        
+        try:
+            # Check for Nginx
+            result = subprocess.run(['nginx', '-v'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'nginx/([0-9.]+)', result.stderr)
+                version = version_match.group(1) if version_match else 'Unknown'
+                web_servers.append({'name': 'Nginx', 'version': version})
+        except:
+            pass
+        
+        # Detect programming languages
+        languages = {'Python': {'version': platform.python_version()}}
+        
+        # Check for Node.js
+        try:
+            result = subprocess.run(['node', '--version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                languages['Node.js'] = {'version': result.stdout.strip().lstrip('v')}
+        except:
+            pass
+        
+        # Check for PHP
+        try:
+            result = subprocess.run(['php', '--version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_match = re.search(r'PHP ([0-9.]+)', result.stdout)
+                if version_match:
+                    languages['PHP'] = {'version': version_match.group(1)}
+        except:
+            pass
+        
+        # Get OS info
+        os_info = f"{platform.system()} {platform.release()}"
+        
+        return {
+            'hostname': hostname,
+            'primary_ip': public_ip,
+            'primary_domain': hostname if '.' in hostname else 'localhost',
+            'primary_web_server': web_servers[0]['name'] if web_servers else 'Not detected',
+            'primary_languages': list(languages.keys())[:3],
+            'total_services': len(web_servers),
+            'os_info': os_info,
+            'server_info': {
+                'ip_addresses': {'eth0': {'ips': [{'ip': public_ip, 'type': 'public'}], 'status': 'UP'}},
+                'domain_names': [],
+                'web_servers': web_servers,
+                'installed_languages': languages,
+                'network_services': [],
+                'system_info': {'pretty_name': os_info}
+            }
+        }
+
     def run_audit(self) -> List[Finding]:
         """Run comprehensive security audit with Phase 2 enhancements"""
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.6',
+            'version': '3.0.7',
             'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
             'environment': os.environ.get('VIGILEGUARD_ENV', 'production'),
             'repository': 'https://github.com/navinnm/VigileGuard'
@@ -826,10 +919,13 @@ class Phase2AuditEngine:
                     print(f"❌ Error in {task_name}: {e}")
                 self.logger.error(f"Error in {task_name}: {e}")
         
+        # Generate unified server summary
+        self.server_summary = self.get_unified_server_info()
+        
         # Generate enhanced reports
         try:
             from enhanced_reporting import ReportManager
-            report_manager = ReportManager(self.all_findings, scan_info)
+            report_manager = ReportManager(self.all_findings, scan_info, self.server_summary)
             
             # Save reports in configured formats
             output_dir = self.config.get('reporting', {}).get('output_directory', './reports')
@@ -967,12 +1063,17 @@ def main_phase2():
             # Handle specific output format requests
             if output and output_format != 'all':
                 try:
+                    # Get server summary from engine
+                    server_summary = getattr(engine, 'server_summary', {})
+                    if not server_summary and hasattr(engine, 'get_unified_server_info'):
+                        server_summary = engine.get_unified_server_info()
+                    
                     from enhanced_reporting import ReportManager
                     report_manager = ReportManager(findings, {
                         'timestamp': datetime.now().isoformat(),
                         'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
-                        'version': '3.0.6'
-                    })
+                        'version': '3.0.7'
+                    }, server_summary)
                     
                     if output_format == 'html':
                         report_manager.html_reporter.generate_report(output)

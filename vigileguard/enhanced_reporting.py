@@ -6,6 +6,7 @@ HTML reports, compliance mapping, and trend tracking
 
 import json
 import os
+import subprocess
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -45,6 +46,483 @@ except ImportError:
                 result = asdict(self)
                 result["severity"] = self.severity.value
                 return result
+
+class PDFReporter:
+    """PDF report generator using HTML to PDF conversion"""
+    
+    def __init__(self, findings: List[Finding], scan_info: Dict[str, Any], server_summary: Optional[Dict[str, Any]] = None):
+        self.findings = findings
+        self.scan_info = scan_info
+        self.server_summary = server_summary or {}
+        self.html_reporter = HTMLReporter(findings, scan_info, server_summary)
+    
+    def generate_report(self, output_path: str) -> str:
+        """Generate PDF report from HTML using wkhtmltopdf or alternative methods"""
+        # Ensure output directory exists
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # Try multiple PDF generation methods
+        methods = [
+            self._generate_with_wkhtmltopdf,
+            self._generate_with_weasyprint,
+            self._generate_with_simple_pdf,
+            self._generate_fallback_html
+        ]
+        
+        for method in methods:
+            try:
+                result = method(output_path)
+                if result:
+                    return result
+            except Exception as e:
+                print(f"PDF generation method failed: {e}")
+                continue
+        
+        # If all methods fail, return the HTML file path as fallback
+        html_path = output_path.replace('.pdf', '.html')
+        return self.html_reporter.generate_report(html_path)
+    
+    def _generate_with_wkhtmltopdf(self, output_path: str) -> Optional[str]:
+        """Generate PDF using wkhtmltopdf"""
+        # Check if wkhtmltopdf is available
+        try:
+            subprocess.run(['wkhtmltopdf', '--version'], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+        
+        # Create temporary HTML file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as temp_html:
+            html_content = self._create_pdf_optimized_html()
+            temp_html.write(html_content)
+            temp_html_path = temp_html.name
+        
+        try:
+            # Generate PDF using wkhtmltopdf with optimized settings
+            cmd = [
+                'wkhtmltopdf',
+                '--page-size', 'A4',
+                '--orientation', 'Portrait',
+                '--margin-top', '0.75in',
+                '--margin-right', '0.75in',
+                '--margin-bottom', '0.75in',
+                '--margin-left', '0.75in',
+                '--encoding', 'UTF-8',
+                '--enable-local-file-access',
+                '--disable-javascript',  # Disable JS for PDF generation
+                temp_html_path,
+                output_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0 and os.path.exists(output_path):
+                return output_path
+            else:
+                print(f"wkhtmltopdf error: {result.stderr}")
+                return None
+                
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+    
+    def _generate_with_weasyprint(self, output_path: str) -> Optional[str]:
+        """Generate PDF using WeasyPrint (Python library)"""
+        try:
+            import weasyprint
+            
+            html_content = self._create_pdf_optimized_html()
+            
+            # Generate PDF
+            html_doc = weasyprint.HTML(string=html_content)
+            html_doc.write_pdf(output_path)
+            
+            if os.path.exists(output_path):
+                return output_path
+            else:
+                return None
+                
+        except ImportError:
+            return None
+        except Exception as e:
+            print(f"WeasyPrint error: {e}")
+            return None
+    
+    def _generate_with_simple_pdf(self, output_path: str) -> Optional[str]:
+        """Generate PDF using simple HTML to PDF conversion"""
+        try:
+            # Try using browser-based conversion if available
+            html_content = self._create_pdf_optimized_html()
+            
+            # Save as temporary HTML file
+            temp_html = output_path.replace('.pdf', '_temp.html')
+            with open(temp_html, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Try chromium/chrome headless
+            chrome_commands = [
+                'google-chrome',
+                'chromium-browser', 
+                'chromium',
+                'chrome'
+            ]
+            
+            for cmd in chrome_commands:
+                try:
+                    result = subprocess.run([
+                        cmd, '--headless', '--disable-gpu', '--no-sandbox',
+                        '--print-to-pdf=' + output_path,
+                        'file://' + os.path.abspath(temp_html)
+                    ], capture_output=True, timeout=30)
+                    
+                    if result.returncode == 0 and os.path.exists(output_path):
+                        os.unlink(temp_html)  # Clean up
+                        return output_path
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    continue
+            
+            # Clean up temp file if PDF generation failed
+            try:
+                os.unlink(temp_html)
+            except:
+                pass
+                
+            return None
+            
+        except Exception as e:
+            print(f"Simple PDF generation error: {e}")
+            return None
+    
+    def _generate_fallback_html(self, output_path: str) -> str:
+        """Fallback: Generate HTML file when PDF generation fails"""
+        html_path = output_path.replace('.pdf', '_fallback.html')
+        return self.html_reporter.generate_report(html_path)
+    
+    def _create_pdf_optimized_html(self) -> str:
+        """Create HTML optimized for PDF generation (no JavaScript, embedded CSS)"""
+        server_header = self.html_reporter._generate_server_header()
+        summary = self.html_reporter._generate_summary()
+        findings_html = self._generate_pdf_findings_html()
+        server_details = self.html_reporter._generate_server_details_section()
+        
+        # Create PDF-optimized template without JavaScript and with print-friendly styles
+        html_template = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VigileGuard Security Report - {self.server_summary.get('hostname', 'Security Audit')}</title>
+    <style>
+        {self._get_pdf_css_styles()}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Enhanced Server Information Header -->
+        {server_header}
+        
+        <!-- Main Header -->
+        <header class="main-header">
+            <h1>🛡️ VigileGuard Security Report</h1>
+            <small>Powered by Fulgid v{self.scan_info.get('version', '3.0.7')}</small>
+            <div class="scan-info">
+                <p><strong>Scan Date:</strong> {self.scan_info.get('timestamp', 'Unknown')}</p>
+                <p><strong>Tool Version:</strong> {self.scan_info.get('version', '3.0.7')}</p>
+                <p><strong>Repository:</strong> {self.scan_info.get('repository', '#')}</p>
+            </div>
+        </header>
+        
+        <!-- Summary Section -->
+        <section class="summary">
+            {summary}
+        </section>
+        
+        <!-- Security Findings -->
+        <section class="findings">
+            <h2>Security Findings</h2>
+            {findings_html}
+        </section>
+        
+        <!-- Detailed Server Information -->
+        {server_details}
+        
+        <footer class="footer">
+            <p>Generated by VigileGuard v{self.scan_info.get('version', '3.0.7')} | 
+            <a href="{self.scan_info.get('repository', '#')}">GitHub Repository</a></p>
+        </footer>
+    </div>
+</body>
+</html>
+        """
+        return html_template
+    
+    def _generate_pdf_findings_html(self) -> str:
+        """Generate findings HTML optimized for PDF (no collapsible sections)"""
+        if not self.findings:
+            return """
+            <div class="no-findings">
+                <h3>✅ No Security Issues Found</h3>
+                <p>Congratulations! VigileGuard did not detect any security issues during this scan.</p>
+            </div>
+            """
+        
+        # Generate affected files section (expanded for PDF)
+        findings_html = self._generate_pdf_affected_files_section()
+        
+        # Separate security findings from informational findings
+        security_findings = [f for f in self.findings if f.severity != SeverityLevel.INFO]
+        info_findings = [f for f in self.findings if f.severity == SeverityLevel.INFO]
+        
+        if security_findings:
+            # Group security findings by severity
+            findings_by_severity = {}
+            for finding in security_findings:
+                severity = finding.severity.value
+                if severity not in findings_by_severity:
+                    findings_by_severity[severity] = []
+                findings_by_severity[severity].append(finding)
+            
+            # Order by severity
+            severity_order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+            
+            for severity in severity_order:
+                if severity in findings_by_severity:
+                    findings_html += f"""
+                    <div class="severity-section">
+                        <h3 class="severity-header severity-{severity.lower()}">{severity} Issues ({len(findings_by_severity[severity])})</h3>
+                    """
+                    
+                    for finding in findings_by_severity[severity]:
+                        findings_html += self.html_reporter._generate_finding_card(finding)
+                    
+                    findings_html += "</div>"
+        
+        # Add informational findings (expanded for PDF)
+        if info_findings:
+            findings_html += f"""
+            <div class="info-section">
+                <h3 class="info-header">📋 System Information ({len(info_findings)} items)</h3>
+                <div class="info-content expanded">
+            """
+            
+            for finding in info_findings:
+                findings_html += self.html_reporter._generate_finding_card(finding)
+            
+            findings_html += """
+                </div>
+            </div>
+            """
+        
+        return findings_html
+    
+    def _generate_pdf_affected_files_section(self) -> str:
+        """Generate expanded affected files section for PDF"""
+        file_issues = {}
+        folder_issues = {}
+        
+        # Extract file and folder information from findings
+        for finding in self.findings:
+            if finding.details and isinstance(finding.details, dict):
+                files_found = self._extract_file_paths_pdf(finding.details)
+                
+                for file_path in files_found:
+                    if file_path not in file_issues:
+                        file_issues[file_path] = []
+                    file_issues[file_path].append({
+                        'title': finding.title,
+                        'severity': finding.severity.value,
+                        'category': finding.category
+                    })
+                    
+                    folder = os.path.dirname(file_path) if file_path != '/' else '/'
+                    if folder and folder not in folder_issues:
+                        folder_issues[folder] = set()
+                    if folder:
+                        folder_issues[folder].add(finding.category)
+        
+        if not file_issues and not folder_issues:
+            return ""
+        
+        section_html = """
+        <section class="affected-files-section">
+            <h3>📁 Affected Files and Folders</h3>
+            <div class="affected-files-content expanded">
+        """
+        
+        # Generate folder summary (always expanded for PDF)
+        if folder_issues:
+            section_html += """
+            <div class="folder-summary">
+                <h4>📂 Folders with Issues</h4>
+                <div class="folder-grid">
+            """
+            
+            for folder, categories in sorted(folder_issues.items()):
+                issue_count = sum(len(issues) for path, issues in file_issues.items() 
+                                if path.startswith(folder + '/') or path == folder)
+                section_html += f"""
+                <div class="folder-item">
+                    <div class="folder-path">{folder or '/'}</div>
+                    <div class="folder-stats">
+                        <span class="issue-count">{issue_count} issues</span>
+                        <span class="category-list">{', '.join(sorted(categories))}</span>
+                    </div>
+                </div>
+                """
+            
+            section_html += "</div></div>"
+        
+        # Generate file details (always expanded for PDF)
+        if file_issues:
+            section_html += """
+            <div class="file-details">
+                <h4>📄 Files with Specific Issues</h4>
+                <div class="file-list">
+            """
+            
+            for file_path, issues in sorted(file_issues.items()):
+                highest_severity = self._get_highest_severity_pdf(issues)
+                section_html += f"""
+                <div class="file-item severity-{highest_severity.lower()}">
+                    <div class="file-header">
+                        <span class="file-icon">📄</span>
+                        <div class="file-path">{file_path}</div>
+                        <span class="severity-badge severity-{highest_severity.lower()}">{highest_severity}</span>
+                    </div>
+                    <div class="file-issues">
+                """
+                
+                for issue in issues:
+                    section_html += f"""
+                    <div class="issue-item">
+                        <span class="issue-title">{issue['title']}</span>
+                        <span class="issue-category">{issue['category']}</span>
+                    </div>
+                    """
+                
+                section_html += "</div></div>"
+            
+            section_html += "</div></div>"
+        
+        section_html += "</div></section>"
+        return section_html
+    
+    def _extract_file_paths_pdf(self, details: Dict[str, Any]) -> List[str]:
+        """Extract file paths from finding details for PDF reporter"""
+        file_paths = []
+        
+        # Common keys that might contain file paths
+        path_keys = ['file', 'path', 'config_file', 'files', 'affected_files', 'file_path', 'location']
+        
+        for key, value in details.items():
+            if any(path_key in key.lower() for path_key in path_keys):
+                if isinstance(value, str) and (value.startswith('/') or value.startswith('./')):
+                    file_paths.append(value)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, str) and (item.startswith('/') or item.startswith('./')):
+                            file_paths.append(item)
+                        elif isinstance(item, dict) and 'path' in item:
+                            file_paths.append(item['path'])
+        
+        return file_paths
+    
+    def _get_highest_severity_pdf(self, issues: List[Dict[str, str]]) -> str:
+        """Get the highest severity from a list of issues for PDF reporter"""
+        severity_order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']
+        
+        highest = 'INFO'
+        for issue in issues:
+            severity = issue.get('severity', 'INFO')
+            if severity_order.index(severity) < severity_order.index(highest):
+                highest = severity
+        
+        return highest
+    
+    def _get_pdf_css_styles(self) -> str:
+        """Get CSS styles optimized for PDF generation"""
+        base_css = self.html_reporter._get_css_styles()
+        
+        # Add PDF-specific styles
+        pdf_css = """
+        /* PDF-specific styles */
+        @media print {
+            body {
+                font-size: 11pt;
+                line-height: 1.4;
+            }
+            
+            .container {
+                max-width: none;
+                margin: 0;
+                padding: 10pt;
+            }
+            
+            .main-header {
+                page-break-inside: avoid;
+                margin-bottom: 20pt;
+            }
+            
+            .severity-section {
+                page-break-inside: avoid;
+                margin-bottom: 15pt;
+            }
+            
+            .finding-card {
+                page-break-inside: avoid;
+                margin-bottom: 10pt;
+            }
+            
+            .server-info-header {
+                page-break-inside: avoid;
+            }
+            
+            .summary {
+                page-break-inside: avoid;
+            }
+            
+            .charts {
+                display: none; /* Hide charts in PDF */
+            }
+            
+            /* Ensure sections don't break across pages */
+            h2, h3, h4 {
+                page-break-after: avoid;
+            }
+            
+            /* Make sure collapsible content is visible */
+            .info-content, .affected-files-content {
+                display: block !important;
+            }
+            
+            /* Hide toggle controls */
+            .info-header, .section-header {
+                cursor: default;
+            }
+            
+            /* Adjust spacing for print */
+            .detail-item {
+                margin-bottom: 8pt;
+            }
+            
+            .file-item, .folder-item {
+                margin-bottom: 8pt;
+            }
+        }
+        
+        /* Always show content in PDF mode */
+        .info-content.expanded,
+        .affected-files-content.expanded {
+            display: block !important;
+        }
+        """
+        
+        return base_css + pdf_css
+
 
 class HTMLReporter:
     """Enhanced HTML reporter with comprehensive server information display"""
@@ -96,10 +574,10 @@ class HTMLReporter:
         <!-- Main Header -->
         <header class="main-header">
             <h1>🛡️ VigileGuard Security Report</h1>
-            <small>Powered by Fulgid v{self.scan_info.get('version', '3.0.6')}</small>
+            <small>Powered by Fulgid v{self.scan_info.get('version', '3.0.7')}</small>
             <div class="scan-info">
                 <p><strong>Scan Date:</strong> {self.scan_info.get('timestamp', 'Unknown')}</p>
-                <p><strong>Tool Version:</strong> {self.scan_info.get('version', '3.0.6')}</p>
+                <p><strong>Tool Version:</strong> {self.scan_info.get('version', '3.0.7')}</p>
                 <p><strong>Repository:</strong> <a href="{self.scan_info.get('repository', '#')}">GitHub</a></p>
             </div>
         </header>
@@ -129,7 +607,7 @@ class HTMLReporter:
         {server_details}
         
         <footer class="footer">
-            <p>Generated by VigileGuard v{self.scan_info.get('version', '3.0.6')} | 
+            <p>Generated by VigileGuard v{self.scan_info.get('version', '3.0.7')} | 
             <a href="{self.scan_info.get('repository', '#')}">GitHub Repository</a></p>
         </footer>
     </div>
@@ -1303,6 +1781,20 @@ class HTMLReporter:
                 toggle.textContent = '▲';
             }}
         }}
+        
+        // Toggle affected files section
+        function toggleAffectedFiles() {{
+            const content = document.getElementById('affected-files-content');
+            const toggle = document.getElementById('files-toggle');
+            
+            if (content.classList.contains('show')) {{
+                content.classList.remove('show');
+                toggle.textContent = '▼';
+            }} else {{
+                content.classList.add('show');
+                toggle.textContent = '▲';
+            }}
+        }}
         """
 
 class ComplianceMapper:
@@ -1732,10 +2224,12 @@ class TrendTracker:
 class ReportManager:
     """Manage different types of security reports"""
     
-    def __init__(self, findings: List[Finding], scan_info: Dict[str, Any]):
+    def __init__(self, findings: List[Finding], scan_info: Dict[str, Any], server_summary: Optional[Dict[str, Any]] = None):
         self.findings = findings
         self.scan_info = scan_info
-        self.html_reporter = HTMLReporter(findings, scan_info)
+        self.server_summary = server_summary or {}
+        self.html_reporter = HTMLReporter(findings, scan_info, server_summary)
+        self.pdf_reporter = PDFReporter(findings, scan_info, server_summary)
         self.compliance_mapper = ComplianceMapper()
         self.trend_tracker = TrendTracker()
     
@@ -1830,6 +2324,14 @@ class ReportManager:
             generated_files['compliance'] = str(compliance_file)
         except Exception as e:
             print(f"Warning: Failed to generate compliance report: {e}")
+        
+        try:
+            # PDF Report
+            pdf_file = output_path / f"vigileguard_report_{hostname}_{timestamp}.pdf"
+            pdf_result = self.pdf_reporter.generate_report(str(pdf_file))
+            generated_files['pdf'] = pdf_result
+        except Exception as e:
+            print(f"Warning: Failed to generate PDF report: {e}")
         
         return generated_files
     
