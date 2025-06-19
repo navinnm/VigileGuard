@@ -184,7 +184,7 @@ Examples:
                        help='Create multiple badge styles')
     parser.add_argument('--output-dir', default='badges',
                        help='Output directory for multiple badges (default: badges)')
-    parser.add_argument('--version', action='version', version='VigileGuard Badge Generator 3.0.2')
+    parser.add_argument('--version', action='version', version='VigileGuard Badge Generator 3.0.3')
     
     args = parser.parse_args()
     

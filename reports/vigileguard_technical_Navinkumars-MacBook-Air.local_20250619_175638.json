@@ -2,7 +2,7 @@
   "scan_metadata": {
     "timestamp": "2025-06-19T17:56:36.575863",
     "tool": "VigileGuard",
-    "version": "3.0.2",
+    "version": "3.0.3",
     "hostname": "Navinkumars-MacBook-Air.local",
     "environment": "production",
     "repository": "https://github.com/navinnm/VigileGuard"
