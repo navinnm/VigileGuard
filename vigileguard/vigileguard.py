@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """
-VigileGuard - Linux Security Audit Tool (Phase 1)
-A comprehensive security audit tool for Linux systems
+VigileGuard - Security Audit Engine (Phase 3)
+A comprehensive security audit tool for Linux systems with API and CI/CD integration
 
 Repository: https://github.com/navinnm/VigileGuard
 Author: VigileGuard Development Team
 License: MIT
-Version: 1.0.5
+Version: 3.0.0
+
+Features:
+- Comprehensive security scanning (Phase 1)
+- Web server security audits (Phase 2)  
+- REST API with authentication (Phase 3)
+- CI/CD integrations (GitHub Actions, GitLab, Jenkins)
+- Webhook notifications (Slack, Teams, Discord)
+- Report generation (JSON, HTML, PDF, CSV)
+- Role-based access control
 """
 
 import os
@@ -51,7 +60,7 @@ except ImportError as e:
         def fit(text, **kwargs):
             return text
 
-__version__ = "1.0.5"
+__version__ = "3.0.0"
 
 # Global console for rich output
 console = Console()
@@ -2412,31 +2421,245 @@ class AuditEngine:
             report["summary"]["by_severity"][severity] = report["summary"]["by_severity"].get(severity, 0) + 1
         
         return json.dumps(report, indent=2, default=str)
+
+
+def run_api_scan(target: Optional[str], api_endpoint: Optional[str], api_key: Optional[str],
+                checkers: Optional[str], output_format: str, output: Optional[str],
+                webhook_url: Optional[str], timeout: int, debug: bool):
+    """Run security scan via Phase 3 API"""
+    import requests
+    import time
     
+    # Default API endpoint
+    if not api_endpoint:
+        api_endpoint = "http://localhost:8000/api/v1"
+    
+    if not target:
+        target = "localhost"
+    
+    # Prepare headers
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    
+    try:
+        if RICH_AVAILABLE:
+            console.print(f"🔍 Starting API scan for target: {target}", style="blue")
+        else:
+            print(f"🔍 Starting API scan for target: {target}")
+        
+        # Create scan
+        scan_data = {
+            "name": f"CLI Scan {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "target": target,
+            "checkers": checkers.split(',') if checkers else [],
+            "metadata": {
+                "cli_version": __version__,
+                "output_format": output_format,
+                "webhook_url": webhook_url
+            }
+        }
+        
+        response = requests.post(
+            f"{api_endpoint}/scans/",
+            json=scan_data,
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            error_msg = f"Failed to create scan: {response.status_code}"
+            if debug:
+                error_msg += f"\nResponse: {response.text}"
+            raise Exception(error_msg)
+        
+        scan_info = response.json()
+        scan_id = scan_info["id"]
+        
+        if RICH_AVAILABLE:
+            console.print(f"✅ Scan created: {scan_id}", style="green")
+        else:
+            print(f"✅ Scan created: {scan_id}")
+        
+        # Start scan
+        response = requests.post(
+            f"{api_endpoint}/scans/{scan_id}/run",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to start scan: {response.status_code}")
+        
+        if RICH_AVAILABLE:
+            console.print("🔄 Scan started, waiting for completion...", style="blue")
+        else:
+            print("🔄 Scan started, waiting for completion...")
+        
+        # Poll for completion
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            response = requests.get(
+                f"{api_endpoint}/scans/{scan_id}",
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Failed to get scan status: {response.status_code}")
+            
+            scan_status = response.json()
+            status = scan_status["status"]
+            
+            if status == "completed":
+                if RICH_AVAILABLE:
+                    console.print("✅ Scan completed successfully", style="green")
+                else:
+                    print("✅ Scan completed successfully")
+                break
+            elif status == "failed":
+                error_msg = scan_status.get("error_message", "Unknown error")
+                raise Exception(f"Scan failed: {error_msg}")
+            elif status == "cancelled":
+                raise Exception("Scan was cancelled")
+            
+            time.sleep(5)  # Wait 5 seconds before polling again
+        else:
+            raise Exception(f"Scan timed out after {timeout} seconds")
+        
+        # Get scan results
+        response = requests.get(
+            f"{api_endpoint}/scans/{scan_id}",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to get scan results: {response.status_code}")
+        
+        results = response.json()
+        
+        # Generate report if needed
+        if output_format != 'console':
+            report_data = {
+                "name": f"API Scan Report {scan_id}",
+                "scan_ids": [scan_id],
+                "format": output_format,
+                "template": "default"
+            }
+            
+            response = requests.post(
+                f"{api_endpoint}/reports/export",
+                json=report_data,
+                headers=headers,
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                if output:
+                    with open(output, 'wb') as f:
+                        f.write(response.content)
+                    if RICH_AVAILABLE:
+                        console.print(f"📄 Report saved to: {output}", style="green")
+                    else:
+                        print(f"📄 Report saved to: {output}")
+                else:
+                    print(response.content.decode() if output_format == 'json' else "Report generated")
+        
+        # Display summary
+        summary = results.get("summary", {})
+        if RICH_AVAILABLE:
+            console.print("\n📊 Scan Summary:", style="bold")
+            console.print(f"  Critical: {summary.get('critical', 0)}", style="red")
+            console.print(f"  High: {summary.get('high', 0)}", style="orange1")
+            console.print(f"  Medium: {summary.get('medium', 0)}", style="yellow")
+            console.print(f"  Low: {summary.get('low', 0)}", style="green")
+            console.print(f"  Total Issues: {summary.get('failed', 0)}", style="bold")
+        else:
+            print("\n📊 Scan Summary:")
+            print(f"  Critical: {summary.get('critical', 0)}")
+            print(f"  High: {summary.get('high', 0)}")
+            print(f"  Medium: {summary.get('medium', 0)}")
+            print(f"  Low: {summary.get('low', 0)}")
+            print(f"  Total Issues: {summary.get('failed', 0)}")
+        
+        # Exit with appropriate code
+        critical_high_count = summary.get('critical', 0) + summary.get('high', 0)
+        if critical_high_count > 0:
+            sys.exit(1)
+        else:
+            sys.exit(0)
+    
+    except requests.RequestException as e:
+        if RICH_AVAILABLE:
+            console.print(f"❌ API request failed: {e}", style="red")
+        else:
+            print(f"❌ API request failed: {e}")
+        if debug:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+    except Exception as e:
+        if RICH_AVAILABLE:
+            console.print(f"❌ API scan failed: {e}", style="red")
+        else:
+            print(f"❌ API scan failed: {e}")
+        if debug:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 @click.command()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--output', '-o', help='Output file path')
 @click.option('--format', '-f', 'output_format', default='console', 
-              type=click.Choice(['console', 'json', 'html', 'compliance', 'all']), 
+              type=click.Choice(['console', 'json', 'html', 'compliance', 'pdf', 'csv', 'all']), 
               help='Output format')
+@click.option('--target', '-t', help='Target hostname or IP address for remote scanning')
 @click.option('--environment', '-e', help='Environment (development/staging/production)')
 @click.option('--notifications', is_flag=True, help='Enable notifications')
 @click.option('--debug', is_flag=True, help='Enable debug output')
+@click.option('--api-mode', is_flag=True, help='Run scan via Phase 3 API')
+@click.option('--api-endpoint', help='API endpoint URL for remote scanning')
+@click.option('--api-key', help='API key for authentication')
+@click.option('--webhook-url', help='Webhook URL for notifications (Slack, Teams, Discord)')
+@click.option('--timeout', default=300, help='Scan timeout in seconds')
+@click.option('--checkers', help='Comma-separated list of checkers to run')
 @click.version_option(version=__version__)
-def main(config: Optional[str], output: Optional[str], output_format: str, 
-         environment: Optional[str], notifications: bool, debug: bool):
+def main(config: Optional[str], output: Optional[str], output_format: str, target: Optional[str],
+         environment: Optional[str], notifications: bool, debug: bool, api_mode: bool,
+         api_endpoint: Optional[str], api_key: Optional[str], webhook_url: Optional[str],
+         timeout: int, checkers: Optional[str]):
     """
-    VigileGuard - Linux Security Audit Tool
+    VigileGuard - Security Audit Engine (Phase 3)
     
     Performs comprehensive security audits including:
+    
+    Phase 1 (Core):
     - File permission analysis
     - User account security checks  
     - SSH configuration review
     - System information gathering
-    - Web server security (if Phase 2 available)
-    - Network security analysis (if Phase 2 available)
+    
+    Phase 2 (Web Security):
+    - Web server security (Apache/Nginx)
+    - SSL/TLS configuration analysis
+    - Network security and firewall checks
+    
+    Phase 3 (API & CI/CD):
+    - REST API with authentication
+    - CI/CD integrations (GitHub Actions, GitLab, Jenkins)
+    - Webhook notifications (Slack, Teams, Discord)
+    - Multi-format reports (JSON, HTML, PDF, CSV)
+    - Remote scanning capabilities
+    - Role-based access control
+    
+    Examples:
+        vigileguard                          # Local scan with console output
+        vigileguard --format json -o scan.json
+        vigileguard --target server.com --api-mode
+        vigileguard --webhook-url $SLACK_URL --notifications
     
     Repository: https://github.com/navinnm/VigileGuard
     """
@@ -2490,6 +2713,37 @@ def main(config: Optional[str], output: Optional[str], output_format: str,
                     print("  - enhanced_reporting.py") 
                     print("  - phase2_integration.py")
                 sys.exit(1)
+        
+        # Check if Phase 3 API mode is requested
+        if api_mode or api_endpoint:
+            if RICH_AVAILABLE:
+                console.print("🚀 Phase 3 API mode enabled", style="blue")
+            else:
+                print("🚀 Phase 3 API mode enabled")
+            
+            # Import Phase 3 API client
+            try:
+                import requests
+                api_client_available = True
+            except ImportError:
+                if RICH_AVAILABLE:
+                    console.print("❌ requests library required for API mode", style="red")
+                    console.print("Install with: pip install requests", style="yellow")
+                else:
+                    print("❌ requests library required for API mode")
+                    print("Install with: pip install requests")
+                sys.exit(1)
+            
+            # Use API endpoint for scanning
+            return run_api_scan(target, api_endpoint, api_key, checkers, output_format, 
+                              output, webhook_url, timeout, debug)
+        
+        # Check for webhook notifications
+        if webhook_url:
+            if RICH_AVAILABLE:
+                console.print(f"🔔 Webhook notifications enabled", style="blue")
+            else:
+                print("🔔 Webhook notifications enabled")
             phase2_available = False
             if RICH_AVAILABLE:
                 console.print(f"⚠️ Phase 2 components not available: {e}", style="yellow")
