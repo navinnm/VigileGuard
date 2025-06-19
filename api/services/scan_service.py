@@ -226,7 +226,7 @@ class ScanService:
             # Update metadata
             scan.metadata.update({
                 'scan_engine': 'VigileGuard',
-                'scan_version': '3.0.0',
+                'scan_version': '3.0.2',
                 'result_file': result_file,
                 'parsed_at': datetime.utcnow().isoformat()
             })

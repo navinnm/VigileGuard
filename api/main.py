@@ -73,7 +73,7 @@ async def periodic_cleanup(api_key_auth: APIKeyAuth):
 app = FastAPI(
     title="VigileGuard Security Audit API",
     description="RESTful API for the VigileGuard Security Audit Engine",
-    version="3.0.0",
+    version="3.0.2",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
@@ -177,7 +177,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "3.0.0",
+        "version": "3.0.2",
         "service": "vigileguard-api"
     }
 
@@ -188,7 +188,7 @@ async def api_info():
     """API information endpoint"""
     return {
         "name": "VigileGuard Security Audit API",
-        "version": "3.0.0",
+        "version": "3.0.2",
         "description": "RESTful API for security scanning and reporting",
         "documentation": "/api/docs",
         "health": "/health",

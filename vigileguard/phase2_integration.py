@@ -749,7 +749,7 @@ class Phase2AuditEngine:
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.0',
+            'version': '3.0.2',
             'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
             'environment': os.environ.get('VIGILEGUARD_ENV', 'production'),
             'repository': 'https://github.com/navinnm/VigileGuard'
@@ -942,7 +942,7 @@ def main_phase2():
                     report_manager = ReportManager(findings, {
                         'timestamp': datetime.now().isoformat(),
                         'hostname': os.uname().nodename if hasattr(os, 'uname') else 'unknown',
-                        'version': '3.0.0'
+                        'version': '3.0.2'
                     })
                     
                     if output_format == 'html':

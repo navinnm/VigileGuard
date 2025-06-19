@@ -6,7 +6,7 @@ A comprehensive security audit tool for Linux systems with API and CI/CD integra
 Repository: https://github.com/navinnm/VigileGuard
 Author: VigileGuard Development Team
 License: MIT
-Version: 3.0.0
+Version: 3.0.2
 
 Features:
 - Comprehensive security scanning (Phase 1)
@@ -60,7 +60,7 @@ except ImportError as e:
         def fit(text, **kwargs):
             return text
 
-__version__ = "3.0.0"
+__version__ = "3.0.2"
 
 # Global console for rich output
 console = Console()
@@ -2163,7 +2163,7 @@ class AuditEngine:
         return {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.0' if getattr(self, 'phase2_available', False) else __version__,
+            'version': '3.0.2' if getattr(self, 'phase2_available', False) else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }
@@ -2765,7 +2765,7 @@ def main(config: Optional[str], output: Optional[str], output_format: str, targe
         scan_info = {
             'timestamp': datetime.now().isoformat(),
             'tool': 'VigileGuard',
-            'version': '3.0.0' if phase2_available else __version__,
+            'version': '3.0.2' if phase2_available else __version__,
             'hostname': platform.node(),
             'repository': 'https://github.com/navinnm/VigileGuard'
         }

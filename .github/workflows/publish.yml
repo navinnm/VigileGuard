@@ -42,7 +42,7 @@ jobs:
         twine upload --repository-url https://test.pypi.org/legacy/ dist/* --verbose || {
           echo "❌ Upload failed. Common causes:"
           echo "1. Package name 'vigileguard' already exists"
-          echo "2. Version '3.0.0' already uploaded"
+          echo "2. Version '3.0.2' already uploaded"
           echo "3. Try changing name to 'vigileguard' or increment version"
           exit 1
         }
@@ -60,6 +60,6 @@ jobs:
     - name: Create package info
       run: |
         echo "📦 Package Information:" >> $GITHUB_STEP_SUMMARY
-        echo "- Version: $(python -c 'import vigileguard; print(vigileguard.__version__ if hasattr(vigileguard, "__version__") else "3.0.0")')" >> $GITHUB_STEP_SUMMARY
+        echo "- Version: $(python -c 'import vigileguard; print(vigileguard.__version__ if hasattr(vigileguard, "__version__") else "3.0.2")')" >> $GITHUB_STEP_SUMMARY
         echo "- Install command: \`pip install vigileguard\`" >> $GITHUB_STEP_SUMMARY
         echo "- Package size: $(du -h dist/*.whl | cut -f1)" >> $GITHUB_STEP_SUMMARY
