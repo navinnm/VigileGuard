@@ -16,7 +16,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="vigileguard",
-    version="3.0.5",
+    version="3.0.6",
     author="VigileGuard Team",
     author_email="team@vigileguard.com",
     description="Comprehensive Security Audit Engine with API & CI/CD Integration",
@@ -60,7 +60,7 @@ setup(
             "uvicorn>=0.24.0",
             "pydantic>=2.0.0",
             "python-multipart>=0.0.6",
-            "aiofiles>=23.0.5",
+            "aiofiles>=23.0.6",
             "httpx>=0.25.0",
         ],
         "ci": [
