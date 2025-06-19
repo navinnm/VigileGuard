@@ -191,10 +191,10 @@ sudo systemctl status vigileguard-api
 ### Using Docker:
 ```bash
 # Build image
-docker build -t vigileguard:v3.0.3 .
+docker build -t vigileguard:v3.0.4 .
 
 # Run container
-docker run -p 8000:8000 vigileguard:v3.0.3
+docker run -p 8000:8000 vigileguard:v3.0.4
 ```
 
 ### Environment Variables:
@@ -214,14 +214,14 @@ EOF
 
 # Create archive
 echo "📦 Creating deployment archive..."
-tar -czf vigileguard-phase3-v3.0.3.tar.gz $DEPLOY_DIR/
+tar -czf vigileguard-phase3-v3.0.4.tar.gz $DEPLOY_DIR/
 
 echo "✅ Deployment package created:"
 echo "   📁 Directory: $DEPLOY_DIR/"
-echo "   📦 Archive: vigileguard-phase3-v3.0.3.tar.gz"
+echo "   📦 Archive: vigileguard-phase3-v3.0.4.tar.gz"
 echo ""
 echo "🚀 To deploy:"
-echo "   1. Copy vigileguard-phase3-v3.0.3.tar.gz to your server"
-echo "   2. Extract: tar -xzf vigileguard-phase3-v3.0.3.tar.gz"
+echo "   1. Copy vigileguard-phase3-v3.0.4.tar.gz to your server"
+echo "   2. Extract: tar -xzf vigileguard-phase3-v3.0.4.tar.gz"
 echo "   3. Install: cd $DEPLOY_DIR && bash quickstart.sh"
 echo "   4. Start API: ./vigileguard-api"
