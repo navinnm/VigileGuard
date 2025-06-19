@@ -1,0 +1,26 @@
+{
+  "scan_id": "d06ea1401377",
+  "timestamp": "2025-06-19T17:55:55.657809",
+  "hostname": "Navinkumars-MacBook-Air.local",
+  "summary": {
+    "total_findings": 17,
+    "risk_score": 55,
+    "categories_affected": 6,
+    "highest_severity": "MEDIUM"
+  },
+  "findings_count": 17,
+  "categories": {
+    "File Permissions": 4,
+    "User Accounts": 2,
+    "SSH": 4,
+    "System Info": 2,
+    "Web Server": 3,
+    "Network Security": 2
+  },
+  "severities": {
+    "LOW": 2,
+    "HIGH": 4,
+    "MEDIUM": 4,
+    "INFO": 7
+  }
+}

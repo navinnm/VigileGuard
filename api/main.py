@@ -210,8 +210,8 @@ app.include_router(webhook_router, prefix="/api/v1")
 app.include_router(config_router, prefix="/api/v1")
 
 
-if __name__ == "__main__":
-    # Development server
+def main():
+    """Main entry point for the API server"""
     uvicorn.run(
         "api.main:app",
         host="127.0.0.1",
@@ -219,3 +219,6 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+
+if __name__ == "__main__":
+    main()

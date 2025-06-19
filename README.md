@@ -218,20 +218,67 @@ jobs:
 
 ### Installation Methods
 
-#### Method 1: pip install (recommended)
+#### Method 1: Quick Installation with Phase 3 (Recommended)
 ```bash
-pip install vigileguard
-```
-
-#### Method 2: From source
-```bash
+# Clone repository
 git clone https://github.com/navinnm/VigileGuard.git
 cd VigileGuard
-pip install -r requirements.txt
-python setup.py install
+
+# Run automated Phase 3 installation
+bash install_phase3.sh
+
+# Test installation
+./vigileguard-cli --help
+./vigileguard-api &  # Start API server
 ```
 
-#### Method 3: Docker deployment
+#### Method 2: Manual Installation
+```bash
+# Clone repository
+git clone https://github.com/navinnm/VigileGuard.git
+cd VigileGuard
+
+# Install base dependencies
+pip3 install -r requirements.txt
+
+# Install Phase 3 API dependencies
+pip3 install fastapi uvicorn pydantic python-multipart aiofiles httpx
+
+# Install in development mode
+pip3 install -e .
+
+# Test Phase 1 & 2
+python3 -m vigileguard.vigileguard
+
+# Test Phase 3 API
+python3 -c "import api.main; print('✅ Phase 3 API OK')"
+python3 -m api
+```
+
+#### Method 3: Add Phase 3 to Existing Installation
+If you already have VigileGuard Phase 1 & 2 working:
+
+```bash
+# In your existing VigileGuard directory
+cd /path/to/your/vigileguard
+
+# Download Phase 3 components
+wget https://github.com/navinnm/VigileGuard/archive/main.zip
+unzip main.zip
+cp -r VigileGuard-main/api .
+cp -r VigileGuard-main/integrations .
+
+# Install Phase 3 dependencies
+pip3 install fastapi uvicorn pydantic python-multipart aiofiles httpx
+
+# Test API
+python3 -c "import api.main; print('✅ Phase 3 API Ready!')"
+
+# Start API server
+python3 -m api
+```
+
+#### Method 4: Docker Deployment
 ```bash
 # Clone repository
 git clone https://github.com/navinnm/VigileGuard.git
@@ -242,6 +289,66 @@ docker-compose up -d
 
 # Access API at http://localhost:8000
 # Access dashboard at http://localhost:3000
+```
+
+#### Method 5: Deployment Package
+For production deployments or isolated environments:
+
+```bash
+# Download deployment package
+wget https://github.com/navinnm/VigileGuard/releases/download/v3.0.0/vigileguard-phase3-v3.0.0.tar.gz
+
+# Extract and install
+tar -xzf vigileguard-phase3-v3.0.0.tar.gz
+cd vigileguard-phase3-deployment
+bash quickstart.sh
+
+# Start services
+./vigileguard-api &
+./vigileguard-cli --help
+```
+
+### Troubleshooting Installation
+
+#### Common Issues:
+
+**1. `ModuleNotFoundError: No module named 'api'`**
+```bash
+# Ensure you're in the correct directory
+cd /path/to/VigileGuard
+
+# Install in development mode
+pip3 install -e .
+
+# Verify installation
+python3 -c "import sys; print('Python path:', sys.path)"
+python3 -c "import api.main; print('API module found')"
+```
+
+**2. Missing Phase 3 Dependencies**
+```bash
+# Install all Phase 3 requirements
+pip3 install fastapi uvicorn pydantic python-multipart aiofiles httpx requests
+```
+
+**3. Permission Issues**
+```bash
+# Make scripts executable
+chmod +x vigileguard-cli vigileguard-api install_phase3.sh
+
+# Check Python permissions
+ls -la $(which python3)
+```
+
+**4. Port 8000 Already in Use**
+```bash
+# Check what's using the port
+netstat -tulpn | grep :8000
+
+# Kill the process or use different port
+# Set environment variable for different port
+export VIGILEGUARD_API_PORT=8001
+python3 -m api
 ```
 
 ## 📚 Usage Examples

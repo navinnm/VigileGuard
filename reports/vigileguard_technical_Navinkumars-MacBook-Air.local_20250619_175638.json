@@ -1,0 +1,1541 @@
+{
+  "scan_metadata": {
+    "timestamp": "2025-06-19T17:56:36.575863",
+    "tool": "VigileGuard",
+    "version": "3.0.0",
+    "hostname": "Navinkumars-MacBook-Air.local",
+    "environment": "production",
+    "repository": "https://github.com/navinnm/VigileGuard"
+  },
+  "findings_summary": {
+    "total_findings": 17,
+    "by_severity": {
+      "LOW": 2,
+      "HIGH": 4,
+      "MEDIUM": 4,
+      "INFO": 7
+    },
+    "by_category": {
+      "File Permissions": 4,
+      "User Accounts": 2,
+      "SSH": 4,
+      "System Info": 2,
+      "Web Server": 3,
+      "Network Security": 2
+    },
+    "risk_distribution": {
+      "high_risk_percentage": 23.5,
+      "most_critical_category": "File Permissions"
+    }
+  },
+  "detailed_findings": [
+    {
+      "category": "File Permissions",
+      "severity": "LOW",
+      "title": "World-writable files detected (37 files)",
+      "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise.",
+      "recommendation": "Use 'chmod o-w <filename>' to remove world-write permissions. Consider using ACLs (setfacl) for fine-grained access control where needed",
+      "details": {
+        "total_files": 37,
+        "by_directory": {
+          "/var/log": 1,
+          "/var/tmp": 36
+        },
+        "categorized_files": {
+          "log_files": [
+            "/var/log/anydesk.trace",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/apticket.der",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/RestoreVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/SystemVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.13_19-32-16+0530_macOS_Mac_25A5279m/logs/iSCPreboot/3D3287DE-280D-4619-AAAB-D97469CA9C71/LocalPolicy/5D05BC07BB103413D3302A2FA2E542133693EF90FBD6397B7286534884013D5DC31CBDCE82D421E5FACAF09268FD43AD.recovery.img4",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/apticket.der",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/RestoreVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/SystemVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.12_23-09-55+0530_macOS_Mac_25A5279m/logs/iSCPreboot/3D3287DE-280D-4619-AAAB-D97469CA9C71/LocalPolicy/5D05BC07BB103413D3302A2FA2E542133693EF90FBD6397B7286534884013D5DC31CBDCE82D421E5FACAF09268FD43AD.recovery.img4",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_oic_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/ucrt_oob_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_dcrt_response.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/MobileActivation/baa_su_request.txt",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/apticket.der",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/RestoreVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/iSCPreboot/SystemRecovery/5D98B84A4C85DA7F192A387FDFF784BFE2EB190136DF97A3D05FF77D70765FF0D106C2D8E235A91347203120485D56BF/SystemVersion.plist",
+            "/var/tmp/sysdiagnose_2025.06.13_13-55-01+0530_macOS_Mac_25A5279m/logs/iSCPreboot/3D3287DE-280D-4619-AAAB-D97469CA9C71/LocalPolicy/5D05BC07BB103413D3302A2FA2E542133693EF90FBD6397B7286534884013D5DC31CBDCE82D421E5FACAF09268FD43AD.recovery.img4"
+          ]
+        },
+        "scan_directories": [
+          "/etc",
+          "/usr",
+          "/var",
+          "/opt",
+          "/srv",
+          "/home",
+          "/var/www",
+          "/var/www/html",
+          "/usr/share/nginx",
+          "/srv/http",
+          "/opt/nginx",
+          "/opt/apache",
+          "/var/log",
+          "/tmp",
+          "/var/tmp"
+        ]
+      }
+    },
+    {
+      "category": "File Permissions",
+      "severity": "HIGH",
+      "title": "Critical system file permission issues (5 files)",
+      "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions.",
+      "recommendation": "Fix permissions immediately using chown and chmod commands. Example: chown root:root /etc/passwd && chmod 644 /etc/passwd",
+      "details": {
+        "critical_files_issues": {
+          "/etc/passwd": {
+            "description": "User account information",
+            "issues": [
+              "group wheel (expected root)"
+            ],
+            "current": {
+              "mode": "0o644",
+              "owner": "root",
+              "group": "wheel"
+            },
+            "expected": {
+              "expected_mode": 420,
+              "owner": "root",
+              "group": "root",
+              "description": "User account information"
+            }
+          },
+          "/etc/group": {
+            "description": "Group information",
+            "issues": [
+              "group wheel (expected root)"
+            ],
+            "current": {
+              "mode": "0o644",
+              "owner": "root",
+              "group": "wheel"
+            },
+            "expected": {
+              "expected_mode": 420,
+              "owner": "root",
+              "group": "root",
+              "description": "Group information"
+            }
+          },
+          "/etc/sudoers": {
+            "description": "Sudo configuration",
+            "issues": [
+              "group wheel (expected root)"
+            ],
+            "current": {
+              "mode": "0o440",
+              "owner": "root",
+              "group": "wheel"
+            },
+            "expected": {
+              "expected_mode": 288,
+              "owner": "root",
+              "group": "root",
+              "description": "Sudo configuration"
+            }
+          },
+          "/etc/ssh/sshd_config": {
+            "description": "SSH daemon configuration",
+            "issues": [
+              "group wheel (expected root)"
+            ],
+            "current": {
+              "mode": "0o644",
+              "owner": "root",
+              "group": "wheel"
+            },
+            "expected": {
+              "expected_mode": 420,
+              "owner": "root",
+              "group": "root",
+              "description": "SSH daemon configuration"
+            }
+          },
+          "/etc/hosts": {
+            "description": "Host name resolution",
+            "issues": [
+              "group wheel (expected root)"
+            ],
+            "current": {
+              "mode": "0o644",
+              "owner": "root",
+              "group": "wheel"
+            },
+            "expected": {
+              "expected_mode": 420,
+              "owner": "root",
+              "group": "root",
+              "description": "Host name resolution"
+            }
+          }
+        }
+      }
+    },
+    {
+      "category": "File Permissions",
+      "severity": "MEDIUM",
+      "title": "Log file permission issues (6 files)",
+      "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable.",
+      "recommendation": "Set log files to mode 640 (rw-r-----) or 644 (rw-r--r--) and ensure proper ownership. Use logrotate with proper permissions.",
+      "details": {
+        "risky_log_files": [
+          {
+            "file": "/var/log/fsck_apfs_error.log",
+            "issue": "World-readable",
+            "mode": "0o644"
+          },
+          {
+            "file": "/var/log/fsck_hfs.log",
+            "issue": "World-readable",
+            "mode": "0o644"
+          },
+          {
+            "file": "/var/log/com.apple.xpc.launchd/launchd.log",
+            "issue": "World-readable",
+            "mode": "0o644"
+          },
+          {
+            "file": "/var/log/com.apple.xpc.launchd/launchd.log.1",
+            "issue": "World-readable",
+            "mode": "0o644"
+          },
+          {
+            "file": "/var/log/com.apple.xpc.launchd/launchd.log.2",
+            "issue": "World-readable",
+            "mode": "0o644"
+          },
+          {
+            "file": "/var/log/shutdown_monitor.log",
+            "issue": "World-readable",
+            "mode": "0o644"
+          }
+        ]
+      }
+    },
+    {
+      "category": "File Permissions",
+      "severity": "HIGH",
+      "title": "Configuration file permission issues (7 files)",
+      "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured.",
+      "recommendation": "Set configuration files to mode 644 (rw-r--r--) for general configs, 640 (rw-r-----) for sensitive configs, and ensure root ownership. Use 'chown root:root <config_file> && chmod 644 <config_file>'",
+      "details": {
+        "risky_config_files": [
+          {
+            "file": "/etc/apache2/extra/httpd-ssl.conf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssh/crypto/apple.conf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssh/crypto/fips.conf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssh/ssh_config.d/100-macos.conf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssh/sshd_config.d/100-macos.conf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssl/x509v3.cnf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          },
+          {
+            "file": "/etc/ssl/openssl.cnf",
+            "issues": [
+              "World-readable (sensitive)"
+            ],
+            "mode": "0o644",
+            "owner": "root"
+          }
+        ],
+        "total_found": 7
+      }
+    },
+    {
+      "category": "User Accounts",
+      "severity": "INFO",
+      "title": "Cannot read /etc/shadow",
+      "description": "Insufficient permissions to check for empty passwords",
+      "recommendation": "Run VigileGuard with appropriate privileges",
+      "details": {}
+    },
+    {
+      "category": "User Accounts",
+      "severity": "MEDIUM",
+      "title": "No password quality checking configured",
+      "description": "PAM password quality modules not found",
+      "recommendation": "Configure pam_pwquality or pam_cracklib for password strength checking",
+      "details": {}
+    },
+    {
+      "category": "SSH",
+      "severity": "HIGH",
+      "title": "Insecure SSH setting: permitrootlogin",
+      "description": "Root login should be disabled. Current: yes",
+      "recommendation": "Set 'PermitRootLogin no' in /etc/ssh/sshd_config",
+      "details": {
+        "setting": "permitrootlogin",
+        "current": "yes",
+        "recommended": "no"
+      }
+    },
+    {
+      "category": "SSH",
+      "severity": "MEDIUM",
+      "title": "Insecure SSH setting: passwordauthentication",
+      "description": "Password authentication should be disabled. Current: yes",
+      "recommendation": "Set 'PasswordAuthentication no' and use key-based authentication",
+      "details": {
+        "setting": "passwordauthentication",
+        "current": "yes",
+        "recommended": "no"
+      }
+    },
+    {
+      "category": "SSH",
+      "severity": "HIGH",
+      "title": "Insecure SSH setting: protocol",
+      "description": "Only SSH protocol version 2 should be used. Current: default",
+      "recommendation": "Set 'Protocol 2' in /etc/ssh/sshd_config",
+      "details": {
+        "setting": "protocol",
+        "current": "default",
+        "recommended": "2"
+      }
+    },
+    {
+      "category": "SSH",
+      "severity": "LOW",
+      "title": "SSH running on default port",
+      "description": "SSH is running on the default port 22",
+      "recommendation": "Consider changing SSH port to a non-standard port for security through obscurity",
+      "details": {
+        "current_port": "22"
+      }
+    },
+    {
+      "category": "System Info",
+      "severity": "INFO",
+      "title": "Operating System Information",
+      "description": "Running Unknown Unknown",
+      "recommendation": "Ensure OS is supported and receiving security updates",
+      "details": {
+        "os_info": {}
+      }
+    },
+    {
+      "category": "System Info",
+      "severity": "INFO",
+      "title": "Kernel Information",
+      "description": "Running kernel version 25.0.0",
+      "recommendation": "Keep kernel updated to latest version for security patches",
+      "details": {
+        "kernel_version": "25.0.0"
+      }
+    },
+    {
+      "category": "Web Server",
+      "severity": "INFO",
+      "title": "Web servers detected",
+      "description": "Found installed web servers: Apache",
+      "recommendation": "Ensure all web servers are properly configured and secured",
+      "details": {
+        "servers": [
+          "Apache"
+        ]
+      }
+    },
+    {
+      "category": "Web Server",
+      "severity": "MEDIUM",
+      "title": "Potentially dangerous Apache modules enabled",
+      "description": "Found enabled modules that may expose sensitive information: mod_status",
+      "recommendation": "Disable unnecessary modules or restrict access to their endpoints",
+      "details": {
+        "dangerous_modules": [
+          "mod_status"
+        ]
+      }
+    },
+    {
+      "category": "Web Server",
+      "severity": "INFO",
+      "title": "Apache version detected",
+      "description": "Apache version 2.4.62 detected",
+      "recommendation": "Keep Apache updated to the latest stable version",
+      "details": {
+        "version": "2.4.62"
+      }
+    },
+    {
+      "category": "Network Security",
+      "severity": "INFO",
+      "title": "Cannot check open ports",
+      "description": "Network monitoring tools (netstat/ss) not available or accessible",
+      "recommendation": "Install net-tools package or run with appropriate privileges",
+      "details": {}
+    },
+    {
+      "category": "Network Security",
+      "severity": "INFO",
+      "title": "DNS configuration detected",
+      "description": "Found 3 DNS servers configured",
+      "recommendation": "Ensure DNS servers are trustworthy and properly secured",
+      "details": {
+        "dns_servers": [
+          "172.105.39.5",
+          "172.105.38.5",
+          "172.105.43.5"
+        ]
+      }
+    }
+  ],
+  "compliance_mapping": {
+    "scan_timestamp": "2025-06-19T17:56:38.068770",
+    "frameworks": {
+      "PCI_DSS": {
+        "description": "Payment Card Industry Data Security Standard",
+        "mapped_controls": {
+          "2.2.4": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "7.1.1": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "7.1.2": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "8.1.1": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "8.2.3": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "2.3": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            }
+          ],
+          "8.2.1": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            }
+          ],
+          "2.2.3": [
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            }
+          ],
+          "6.5.10": [
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            }
+          ],
+          "1.3.1": [
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ],
+          "2.2.2": [
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ]
+        },
+        "total_controls_affected": 11,
+        "total_findings_mapped": 32
+      },
+      "SOC_2": {
+        "description": "Service Organization Control 2",
+        "mapped_controls": {
+          "CC6.1": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            },
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            },
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            },
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            },
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ],
+          "CC6.3": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "CC6.2": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "CC6.7": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            }
+          ],
+          "CC6.8": [
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            }
+          ],
+          "CC6.6": [
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ]
+        },
+        "total_controls_affected": 6,
+        "total_findings_mapped": 30
+      },
+      "NIST_CSF": {
+        "description": "NIST Cybersecurity Framework",
+        "mapped_controls": {
+          "PR.AC-1": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            },
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "PR.AC-4": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "PR.AC-7": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            },
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            }
+          ],
+          "PR.AC-3": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            },
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            },
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ],
+          "PR.PT-3": [
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            }
+          ],
+          "PR.AC-5": [
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ]
+        },
+        "total_controls_affected": 6,
+        "total_findings_mapped": 30
+      },
+      "ISO_27001": {
+        "description": "ISO/IEC 27001:2013",
+        "mapped_controls": {
+          "A.9.1.1": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "A.9.2.3": [
+            {
+              "title": "World-writable files detected (37 files)",
+              "severity": "LOW",
+              "category": "File Permissions",
+              "description": "Found 37 world-writable files across the system. World-writable files can be modified by any user, potentially leading to privilege escalation, data corruption, or system compromise."
+            },
+            {
+              "title": "Critical system file permission issues (5 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found permission issues on 5 critical system files. These files are essential for system security and must have correct permissions."
+            },
+            {
+              "title": "Log file permission issues (6 files)",
+              "severity": "MEDIUM",
+              "category": "File Permissions",
+              "description": "Found 6 log files with permission issues. Log files may contain sensitive information and should not be world-readable or writable."
+            },
+            {
+              "title": "Configuration file permission issues (7 files)",
+              "severity": "HIGH",
+              "category": "File Permissions",
+              "description": "Found 7 configuration files with permission issues. Configuration files often contain sensitive information and should be properly secured."
+            }
+          ],
+          "A.9.2.1": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "A.9.2.2": [
+            {
+              "title": "Cannot read /etc/shadow",
+              "severity": "INFO",
+              "category": "User Accounts",
+              "description": "Insufficient permissions to check for empty passwords"
+            },
+            {
+              "title": "No password quality checking configured",
+              "severity": "MEDIUM",
+              "category": "User Accounts",
+              "description": "PAM password quality modules not found"
+            }
+          ],
+          "A.9.4.2": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            }
+          ],
+          "A.13.1.1": [
+            {
+              "title": "Insecure SSH setting: permitrootlogin",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Root login should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: passwordauthentication",
+              "severity": "MEDIUM",
+              "category": "SSH",
+              "description": "Password authentication should be disabled. Current: yes"
+            },
+            {
+              "title": "Insecure SSH setting: protocol",
+              "severity": "HIGH",
+              "category": "SSH",
+              "description": "Only SSH protocol version 2 should be used. Current: default"
+            },
+            {
+              "title": "SSH running on default port",
+              "severity": "LOW",
+              "category": "SSH",
+              "description": "SSH is running on the default port 22"
+            },
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            },
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ],
+          "A.14.1.3": [
+            {
+              "title": "Web servers detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Found installed web servers: Apache"
+            },
+            {
+              "title": "Potentially dangerous Apache modules enabled",
+              "severity": "MEDIUM",
+              "category": "Web Server",
+              "description": "Found enabled modules that may expose sensitive information: mod_status"
+            },
+            {
+              "title": "Apache version detected",
+              "severity": "INFO",
+              "category": "Web Server",
+              "description": "Apache version 2.4.62 detected"
+            }
+          ],
+          "A.13.1.3": [
+            {
+              "title": "Cannot check open ports",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Network monitoring tools (netstat/ss) not available or accessible"
+            },
+            {
+              "title": "DNS configuration detected",
+              "severity": "INFO",
+              "category": "Network Security",
+              "description": "Found 3 DNS servers configured"
+            }
+          ]
+        },
+        "total_controls_affected": 8,
+        "total_findings_mapped": 30
+      }
+    },
+    "coverage_summary": {
+      "PCI_DSS": {
+        "total_controls": 15,
+        "affected_controls": 11,
+        "coverage_percentage": 73.33,
+        "compliance_level": "Requires Immediate Action"
+      },
+      "SOC_2": {
+        "total_controls": 14,
+        "affected_controls": 6,
+        "coverage_percentage": 42.86,
+        "compliance_level": "Needs Attention"
+      },
+      "NIST_CSF": {
+        "total_controls": 14,
+        "affected_controls": 6,
+        "coverage_percentage": 42.86,
+        "compliance_level": "Needs Attention"
+      },
+      "ISO_27001": {
+        "total_controls": 14,
+        "affected_controls": 8,
+        "coverage_percentage": 57.14,
+        "compliance_level": "Requires Immediate Action"
+      }
+    },
+    "recommendations": [
+      {
+        "priority": "High",
+        "title": "Address Critical and High Severity Issues",
+        "description": "Found 4 critical/high severity issues that impact compliance",
+        "frameworks_affected": [
+          "PCI_DSS",
+          "SOC_2",
+          "NIST_CSF",
+          "ISO_27001"
+        ],
+        "estimated_effort": "High"
+      }
+    ]
+  },
+  "remediation_guide": {
+    "quick_wins": [
+      {
+        "title": "World-writable files detected (37 files)",
+        "category": "File Permissions",
+        "severity": "LOW",
+        "recommendation": "Use 'chmod o-w <filename>' to remove world-write permissions. Consider using ACLs (setfacl) for fine-grained access control where needed",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Critical system file permission issues (5 files)",
+        "category": "File Permissions",
+        "severity": "HIGH",
+        "recommendation": "Fix permissions immediately using chown and chmod commands. Example: chown root:root /etc/passwd && chmod 644 /etc/passwd",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Log file permission issues (6 files)",
+        "category": "File Permissions",
+        "severity": "MEDIUM",
+        "recommendation": "Set log files to mode 640 (rw-r-----) or 644 (rw-r--r--) and ensure proper ownership. Use logrotate with proper permissions.",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Configuration file permission issues (7 files)",
+        "category": "File Permissions",
+        "severity": "HIGH",
+        "recommendation": "Set configuration files to mode 644 (rw-r--r--) for general configs, 640 (rw-r-----) for sensitive configs, and ensure root ownership. Use 'chown root:root <config_file> && chmod 644 <config_file>'",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Insecure SSH setting: permitrootlogin",
+        "category": "SSH",
+        "severity": "HIGH",
+        "recommendation": "Set 'PermitRootLogin no' in /etc/ssh/sshd_config",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Insecure SSH setting: passwordauthentication",
+        "category": "SSH",
+        "severity": "MEDIUM",
+        "recommendation": "Set 'PasswordAuthentication no' and use key-based authentication",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Insecure SSH setting: protocol",
+        "category": "SSH",
+        "severity": "HIGH",
+        "recommendation": "Set 'Protocol 2' in /etc/ssh/sshd_config",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "SSH running on default port",
+        "category": "SSH",
+        "severity": "LOW",
+        "recommendation": "Consider changing SSH port to a non-standard port for security through obscurity",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Operating System Information",
+        "category": "System Info",
+        "severity": "INFO",
+        "recommendation": "Ensure OS is supported and receiving security updates",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Kernel Information",
+        "category": "System Info",
+        "severity": "INFO",
+        "recommendation": "Keep kernel updated to latest version for security patches",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Web servers detected",
+        "category": "Web Server",
+        "severity": "INFO",
+        "recommendation": "Ensure all web servers are properly configured and secured",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Potentially dangerous Apache modules enabled",
+        "category": "Web Server",
+        "severity": "MEDIUM",
+        "recommendation": "Disable unnecessary modules or restrict access to their endpoints",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Apache version detected",
+        "category": "Web Server",
+        "severity": "INFO",
+        "recommendation": "Keep Apache updated to the latest stable version",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "Cannot check open ports",
+        "category": "Network Security",
+        "severity": "INFO",
+        "recommendation": "Install net-tools package or run with appropriate privileges",
+        "estimated_effort": "Low"
+      },
+      {
+        "title": "DNS configuration detected",
+        "category": "Network Security",
+        "severity": "INFO",
+        "recommendation": "Ensure DNS servers are trustworthy and properly secured",
+        "estimated_effort": "Low"
+      }
+    ],
+    "medium_term_projects": [
+      {
+        "title": "Cannot read /etc/shadow",
+        "category": "User Accounts",
+        "severity": "INFO",
+        "recommendation": "Run VigileGuard with appropriate privileges",
+        "estimated_effort": "Medium"
+      },
+      {
+        "title": "No password quality checking configured",
+        "category": "User Accounts",
+        "severity": "MEDIUM",
+        "recommendation": "Configure pam_pwquality or pam_cracklib for password strength checking",
+        "estimated_effort": "Medium"
+      }
+    ],
+    "long_term_initiatives": []
+  },
+  "appendices": {
+    "methodology": "\n        VigileGuard Security Audit Methodology:\n        \n        1. System Discovery: Automated identification of system components, services, and configurations\n        2. Configuration Analysis: Review of security-relevant configuration files and settings  \n        3. Permission Assessment: Analysis of file, directory, and service permissions\n        4. Network Security Review: Evaluation of network services, firewall rules, and exposed ports\n        5. Web Server Security: Assessment of web server configurations and SSL/TLS settings\n        6. Compliance Mapping: Alignment of findings with industry security frameworks\n        7. Risk Assessment: Severity scoring based on potential impact and exploitability\n        8. Remediation Guidance: Actionable recommendations for issue resolution\n        \n        The audit covers multiple security domains including access controls, network security,\n        web server configurations, and system hardening. All checks are performed using read-only\n        operations where possible to minimize impact on production systems.\n        ",
+    "references": [
+      {
+        "title": "NIST Cybersecurity Framework",
+        "url": "https://www.nist.gov/cyberframework",
+        "description": "Framework for improving critical infrastructure cybersecurity"
+      },
+      {
+        "title": "OWASP Security Guidelines",
+        "url": "https://owasp.org/",
+        "description": "Open Web Application Security Project guidelines and best practices"
+      },
+      {
+        "title": "CIS Controls",
+        "url": "https://www.cisecurity.org/controls/",
+        "description": "Center for Internet Security Critical Security Controls"
+      },
+      {
+        "title": "Linux Security Best Practices",
+        "url": "https://linux-audit.com/linux-security-guide/",
+        "description": "Comprehensive Linux security hardening guide"
+      }
+    ]
+  },
+  "trend_analysis": {
+    "analysis_period": "30 days",
+    "total_scans": 3,
+    "hostname_filter": "Navinkumars-MacBook-Air.local",
+    "trends": {
+      "overall": {
+        "trend": "stable",
+        "findings_change": 0,
+        "risk_score_change": 0,
+        "period_start": "2025-06-19T17:55:55.657809",
+        "period_end": "2025-06-19T17:56:36.575863",
+        "total_scans_analyzed": 3
+      },
+      "by_category": {
+        "System Info": {
+          "change": 0,
+          "average_count": 2.0,
+          "trend": "stable"
+        },
+        "User Accounts": {
+          "change": 0,
+          "average_count": 2.0,
+          "trend": "stable"
+        },
+        "Web Server": {
+          "change": 0,
+          "average_count": 3.0,
+          "trend": "stable"
+        },
+        "SSH": {
+          "change": 0,
+          "average_count": 4.0,
+          "trend": "stable"
+        },
+        "Network Security": {
+          "change": 0,
+          "average_count": 2.0,
+          "trend": "stable"
+        },
+        "File Permissions": {
+          "change": 0,
+          "average_count": 4.0,
+          "trend": "stable"
+        }
+      },
+      "by_severity": {
+        "CRITICAL": {
+          "change": 0,
+          "average_count": 0.0,
+          "trend": "stable"
+        },
+        "HIGH": {
+          "change": 0,
+          "average_count": 4.0,
+          "trend": "stable"
+        },
+        "MEDIUM": {
+          "change": 0,
+          "average_count": 4.0,
+          "trend": "stable"
+        },
+        "LOW": {
+          "change": 0,
+          "average_count": 2.0,
+          "trend": "stable"
+        },
+        "INFO": {
+          "change": 0,
+          "average_count": 7.0,
+          "trend": "stable"
+        }
+      }
+    },
+    "recommendations": []
+  }
+}
