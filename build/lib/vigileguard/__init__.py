@@ -267,12 +267,8 @@ if __name__ != "__main__":
 # Entry point for CLI usage
 def main():
     """Main entry point for VigileGuard CLI"""
-    if PHASE2_AVAILABLE:
-        # Use Phase 2 CLI with enhanced features
-        from .phase2_integration import main_phase2
-        return main_phase2()
-    elif CORE_AVAILABLE:
-        # Use Phase 1 CLI
+    if CORE_AVAILABLE:
+        # Use Phase 3 CLI with full features (includes Phase 1 & 2)
         from .vigileguard import main
         return main()
     else:

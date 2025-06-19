@@ -1,0 +1,30 @@
+{
+  "scan_id": "b9aad70a4602",
+  "timestamp": "2025-06-19T19:07:31.426718",
+  "hostname": "localhost",
+  "summary": {
+    "total_findings": 28,
+    "risk_score": 100,
+    "categories_affected": 9,
+    "highest_severity": "MEDIUM"
+  },
+  "findings_count": 28,
+  "categories": {
+    "File Permissions": 4,
+    "Web Security": 1,
+    "User Accounts": 1,
+    "SSH": 4,
+    "System Info": 2,
+    "Web Server": 10,
+    "SSL/TLS": 2,
+    "Web Application": 1,
+    "Network Security": 3
+  },
+  "severities": {
+    "CRITICAL": 1,
+    "HIGH": 9,
+    "MEDIUM": 8,
+    "LOW": 3,
+    "INFO": 7
+  }
+}

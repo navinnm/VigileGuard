@@ -8,7 +8,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/navinnm/VigileGuard)](https://github.com/navinnm/VigileGuard/stargazers)
 [![CI/CD](https://github.com/navinnm/VigileGuard/workflows/VigileGuard%20CI/CD%20Pipeline/badge.svg)](https://github.com/navinnm/VigileGuard/actions)
 [![Security Status](https://img.shields.io/badge/security-monitored-green.svg)](SECURITY.md)
-[![API Status](https://img.shields.io/badge/API-v3.0.4-blue.svg)](api/)
+[![API Status](https://img.shields.io/badge/API-v3.0.5-blue.svg)](api/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](integrations/github_actions/Dockerfile)
 
 **Fast • Developer-Friendly • CI/CD Native • Enterprise-Ready**
@@ -51,7 +51,7 @@ VigileGuard evolves through three phases to become a complete security audit eco
 ### Phase 3 Technical Stack
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    VigileGuard v3.0.4                  │
+│                    VigileGuard v3.0.5                  │
 ├─────────────────────────────────────────────────────────┤
 │  🌐 REST API (FastAPI)                                 │
 │  ├── Authentication (JWT + API Keys)                   │
@@ -173,7 +173,7 @@ pip install -e .
 ### Method 3: Docker Installation
 ```bash
 # Run with Docker
-docker run -p 8000:8000 vigileguard/api:v3.0.4
+docker run -p 8000:8000 vigileguard/api:v3.0.5
 
 # Or use docker-compose
 docker-compose up
@@ -206,7 +206,8 @@ vigileguard
 # Generate JSON report
 vigileguard --format json --output scan_report.json
 
-# Run with notifications
+# Run with webhook notifications
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
 vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL
 
 # Show all available options
@@ -267,7 +268,7 @@ jobs:
       - name: Run Security Scan
         run: |
           vigileguard --format json --output scan-results.json
-          vigileguard --webhook-url ${{ secrets.SLACK_WEBHOOK_URL }}
+          vigileguard --notifications --webhook-url ${{ secrets.SLACK_WEBHOOK_URL }}
         env:
           VIGILEGUARD_ENV: production
 ```
@@ -357,10 +358,10 @@ For production deployments or isolated environments:
 
 ```bash
 # Download deployment package
-wget https://github.com/navinnm/VigileGuard/releases/download/v3.0.4/vigileguard-phase3-v3.0.4.tar.gz
+wget https://github.com/navinnm/VigileGuard/releases/download/v3.0.5/vigileguard-phase3-v3.0.5.tar.gz
 
 # Extract and install
-tar -xzf vigileguard-phase3-v3.0.4.tar.gz
+tar -xzf vigileguard-phase3-v3.0.5.tar.gz
 cd vigileguard-phase3-deployment
 bash quickstart.sh
 
@@ -428,8 +429,25 @@ vigileguard --format html --output security_report.html
 # Remote API scanning
 vigileguard --target production.example.com --api-mode
 
-# With webhook notifications
-vigileguard --webhook-url https://hooks.slack.com/your/webhook/url
+# With webhook notifications (Slack)
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL
+
+# With webhook notifications (Microsoft Teams)
+export TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/YOUR_TENANT_ID@YOUR_TENANT_ID/IncomingWebhook/CHANNEL_ID/CONNECTOR_ID"
+vigileguard --notifications --webhook-url $TEAMS_WEBHOOK_URL
+
+# With webhook notifications (Discord)
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN"
+vigileguard --notifications --webhook-url $DISCORD_WEBHOOK_URL
+
+# Combined scan with multiple outputs and notifications
+vigileguard \
+  --format json \
+  --output security_scan.json \
+  --notifications \
+  --webhook-url $SLACK_WEBHOOK_URL \
+  --checkers ssh,firewall,web-server
 ```
 
 ### API Usage
@@ -516,30 +534,174 @@ curl -X POST http://localhost:8000/api/v1/auth/api-keys \
 
 ### Webhook Notifications
 
+VigileGuard supports real-time notifications via webhooks to popular collaboration platforms. When `--notifications` is enabled with `--webhook-url`, scan results and security alerts are automatically sent to your team.
+
 #### Slack Integration
+
+**Step 1: Create Slack Webhook**
+1. Go to your Slack workspace settings
+2. Navigate to "Apps" → "Manage" → "Custom Integrations" → "Incoming Webhooks"
+3. Click "Add to Slack" and choose your channel
+4. Copy the webhook URL (format: `https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX`)
+
+**Step 2: Use with VigileGuard CLI**
 ```bash
-# Create Slack webhook
+# Set webhook URL
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+
+# Run scan with Slack notifications
+vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL
+
+# Or inline
+vigileguard --notifications --webhook-url "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+```
+
+**Step 3: Configure via API**
+```bash
+# Create Slack webhook via API
 curl -X POST http://localhost:8000/api/v1/webhooks/slack \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Security Alerts",
-    "webhook_url": "https://hooks.slack.com/your/webhook/url",
+    "webhook_url": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
     "events": ["scan.completed", "finding.critical"],
     "channel": "#security"
   }'
 ```
 
-#### Microsoft Teams
+#### Microsoft Teams Integration
+
+**Step 1: Create Teams Webhook**
+1. Open Microsoft Teams and go to your target channel
+2. Click "..." → "Connectors" → "Incoming Webhook" → "Configure"
+3. Give it a name like "VigileGuard Security Alerts"
+4. Copy the webhook URL (format: `https://outlook.office.com/webhook/YOUR_TENANT_ID@YOUR_TENANT_ID/IncomingWebhook/CHANNEL_ID/CONNECTOR_ID`)
+
+**Step 2: Use with VigileGuard CLI**
 ```bash
-# Create Teams webhook
+# Set webhook URL
+export TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/YOUR_TENANT_ID@YOUR_TENANT_ID/IncomingWebhook/CHANNEL_ID/CONNECTOR_ID"
+
+# Run scan with Teams notifications
+vigileguard --notifications --webhook-url $TEAMS_WEBHOOK_URL
+```
+
+**Step 3: Configure via API**
+```bash
+# Create Teams webhook via API
 curl -X POST http://localhost:8000/api/v1/webhooks/teams \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Security Notifications",
-    "webhook_url": "https://outlook.office.com/webhook/your/teams/url",
+    "webhook_url": "https://outlook.office.com/webhook/YOUR_TENANT_ID@YOUR_TENANT_ID/IncomingWebhook/CHANNEL_ID/CONNECTOR_ID",
     "events": ["scan.completed", "scan.failed"]
+  }'
+```
+
+#### Discord Integration
+
+**Step 1: Create Discord Webhook**
+1. Go to your Discord server and channel settings
+2. Navigate to "Integrations" → "Webhooks" → "New Webhook"
+3. Name it "VigileGuard Security" and copy the webhook URL
+4. URL format: `https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN`
+
+**Step 2: Use with VigileGuard CLI**
+```bash
+# Set webhook URL
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN"
+
+# Run scan with Discord notifications
+vigileguard --notifications --webhook-url $DISCORD_WEBHOOK_URL
+```
+
+#### Custom Webhook Integration
+
+**Step 1: Set up your webhook endpoint**
+```python
+# Example webhook receiver (Flask)
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/vigileguard-webhook', methods=['POST'])
+def handle_vigileguard_webhook():
+    data = request.get_json()
+    
+    # Process the webhook data
+    scan_id = data.get('scan_id')
+    findings = data.get('findings', [])
+    critical_count = len([f for f in findings if f['severity'] == 'CRITICAL'])
+    
+    print(f"Received VigileGuard scan {scan_id}: {critical_count} critical findings")
+    
+    return jsonify({"status": "received"})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+```
+
+**Step 2: Use with VigileGuard**
+```bash
+# Run scan with custom webhook
+vigileguard --notifications --webhook-url "https://your-domain.com/vigileguard-webhook"
+```
+
+#### Webhook Payload Format
+
+VigileGuard sends webhook notifications in the following JSON format:
+
+```json
+{
+  "scan_id": "scan_20250619_190843",
+  "timestamp": "2025-06-19T19:08:43.123456",
+  "target": "localhost",
+  "environment": "production",
+  "status": "completed",
+  "summary": {
+    "total_findings": 28,
+    "critical": 5,
+    "high": 5,
+    "medium": 12,
+    "low": 4,
+    "info": 2
+  },
+  "findings": [
+    {
+      "category": "File Permissions",
+      "severity": "CRITICAL",
+      "title": "World-writable files found",
+      "description": "Found files that are writable by all users",
+      "recommendation": "Remove world-write permissions on sensitive files"
+    }
+  ],
+  "reports": {
+    "html": "reports/vigileguard_report_localhost_20250619_190843.html",
+    "json": "reports/vigileguard_technical_localhost_20250619_190843.json"
+  },
+  "compliance": {
+    "pci_dss": "FAIL",
+    "soc2": "PARTIAL",
+    "iso_27001": "PASS"
+  }
+}
+```
+
+#### Webhook Testing
+
+```bash
+# Test webhook connectivity
+vigileguard --notifications --webhook-url $SLACK_WEBHOOK_URL --debug
+
+# Send test webhook via API
+curl -X POST http://localhost:8000/api/v1/webhooks/test \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "webhook_url": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+    "message": "VigileGuard webhook test"
   }'
 ```
 
@@ -637,7 +799,7 @@ docker-compose up dashboard
 
 ### Single Container
 ```bash
-docker run -p 8000:8000 vigileguard/api:v3.0.4
+docker run -p 8000:8000 vigileguard/api:v3.0.5
 ```
 
 ### Multi-Service Deployment
@@ -646,7 +808,7 @@ docker run -p 8000:8000 vigileguard/api:v3.0.4
 version: '3.8'
 services:
   api:
-    image: vigileguard/api:v3.0.4
+    image: vigileguard/api:v3.0.5
     ports:
       - "8000:8000"
     environment:
@@ -657,7 +819,7 @@ services:
       - redis
 
   dashboard:
-    image: vigileguard/dashboard:v3.0.4
+    image: vigileguard/dashboard:v3.0.5
     ports:
       - "3000:3000"
     environment:
@@ -807,7 +969,9 @@ export DATABASE_URL=postgresql://user:pass@localhost:5432/vigileguard
 export REDIS_URL=redis://localhost:6379
 
 # External Integrations
-export SLACK_WEBHOOK_URL=https://hooks.slack.com/your/url
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+export TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/YOUR_TENANT_ID@YOUR_TENANT_ID/IncomingWebhook/CHANNEL_ID/CONNECTOR_ID"
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN"
 export GITHUB_TOKEN=your-github-token
 ```
 
@@ -879,6 +1043,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**VigileGuard v3.0.4** - Comprehensive Security Audit Engine with API & CI/CD Integration
+**VigileGuard v3.0.5** - Comprehensive Security Audit Engine with API & CI/CD Integration
 
 Made with ❤️ by the VigileGuard Team
